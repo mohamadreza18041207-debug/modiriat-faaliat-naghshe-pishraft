@@ -6,6 +6,7 @@
 <title>سامانه مدیریت نقشه پیشرفت</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   @font-face { font-family:'B Nazanin'; src: local('B Nazanin'), local('BNazanin'); }
   :root{
@@ -147,7 +148,74 @@
 <input type="file" id="importJsonInput" accept=".json" class="hidden">
 <input type="file" id="importPmapJsonInput" accept=".json" class="hidden">
 
+<div id="authOverlay" style="position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:min(430px,100%);padding:28px">
+    <h2 style="font-size:24px;font-weight:800;margin:0 0 8px">ورود به سامانه</h2>
+    <p class="text-muted" style="margin:0 0 18px">نام کاربری و رمز خود را وارد کنید.</p>
+    <input id="authUsername" autocomplete="username" placeholder="نام کاربری" style="width:100%;margin-bottom:10px">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="رمز عبور" style="width:100%;margin-bottom:12px">
+    <button id="authLoginBtn" class="btn btn-primary" style="width:100%">ورود</button>
+    <p id="authMessage" style="min-height:22px;color:#c0392b;margin:12px 0 0"></p>
+  </div>
+</div>
+
 <script>
+const SUPABASE_URL = "https://fkttzrydoimolldqqnbo.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_85hlIYMJAA705aiOqTUb0A_xCrNeQ6Z";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let cloudUser = null;
+
+function setAuthMessage(message, error = true){
+  const el = document.getElementById("authMessage");
+  if(el){ el.textContent = message || ""; el.style.color = error ? "#c0392b" : "#168a55"; }
+}
+
+async function loginToCloud(){
+  const username = document.getElementById("authUsername").value.trim();
+  const password = document.getElementById("authPassword").value;
+  if(!username || !password){ setAuthMessage("نام کاربری و رمز را وارد کنید"); return; }
+  const button = document.getElementById("authLoginBtn");
+  button.disabled = true; setAuthMessage("در حال ورود...", false);
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email: username + "@internal.local", password });
+  button.disabled = false;
+  if(error){ setAuthMessage("ورود ناموفق بود. اطلاعات را بررسی کنید."); return; }
+  cloudUser = data.user;
+  document.getElementById("authOverlay").style.display = "none";
+  await cloudLoadState();
+  loadData(); pmLoad(); showTab("dashboard");
+}
+
+function cloudPayload(){ return { tasks, notes, owners, pmActivities, pmCounties, pmProgress, pmActiveCounty, pmMeta }; }
+
+async function cloudLoadState(){
+  try{
+    const { data, error } = await supabaseClient.from("app_state").select("payload").eq("id",1).maybeSingle();
+    if(error || !data?.payload) return;
+    const p = data.payload;
+    if(Array.isArray(p.tasks)) localStorage.setItem(LS_TASKS, JSON.stringify(p.tasks));
+    if(Array.isArray(p.notes)) localStorage.setItem(LS_NOTES, JSON.stringify(p.notes));
+    if(Array.isArray(p.owners)) localStorage.setItem(LS_OWNERS, JSON.stringify(p.owners));
+    if(Array.isArray(p.pmActivities)) localStorage.setItem(LS_PM_ACTIVITIES, JSON.stringify(p.pmActivities));
+    if(Array.isArray(p.pmCounties)) localStorage.setItem(LS_PM_COUNTIES, JSON.stringify(p.pmCounties));
+    if(p.pmProgress) localStorage.setItem(LS_PM_PROGRESS, JSON.stringify(p.pmProgress));
+    if(p.pmActiveCounty) localStorage.setItem(LS_PM_ACTIVE, p.pmActiveCounty);
+    if(p.pmMeta) localStorage.setItem(LS_PM_META, JSON.stringify(p.pmMeta));
+  }catch(e){ console.warn("cloud load unavailable", e); }
+}
+
+let cloudSaveTimer;
+function queueCloudSave(){
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(async()=>{
+    if(!cloudUser) return;
+    try{ await supabaseClient.from("app_state").upsert({id:1,payload:cloudPayload(),updated_by:cloudUser.id}); }
+    catch(e){ console.warn("cloud save unavailable", e); }
+  }, 400);
+}
+
+document.getElementById("authLoginBtn").addEventListener("click", loginToCloud);
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") loginToCloud(); });
+
 function tdiv(a, b) {
   const q = a / b;
   return q >= 0 ? Math.floor(q) : -Math.floor(-q);
@@ -322,9 +390,9 @@ function loadData(){
   owners.sort(function(a,b){ return a.localeCompare(b,"fa"); });
   if(changed) saveOwners();
 }
-function saveTasks(){ try { localStorage.setItem(LS_TASKS, JSON.stringify(tasks)); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
-function saveNotes(){ try { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
-function saveOwners(){ try { localStorage.setItem(LS_OWNERS, JSON.stringify(owners)); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+function saveTasks(){ try { localStorage.setItem(LS_TASKS, JSON.stringify(tasks)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+function saveNotes(){ try { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+function saveOwners(){ try { localStorage.setItem(LS_OWNERS, JSON.stringify(owners)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
 
 /* ============================================================
    Toast
@@ -2134,5 +2202,6 @@ pmLoad();
 showTab("dashboard");
 
 </script>
+<script src="admin-panel.js"></script>
 </body>
 </html>
