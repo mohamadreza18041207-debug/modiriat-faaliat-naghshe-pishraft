@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>سامانه مدیریت نقشه پیشرفت</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @font-face { font-family:'B Nazanin'; src: local('B Nazanin'), local('BNazanin'); }
+  :root{
+    --bg:#f2f5fb; --surface:#ffffff; --surface-2:#f7f9fc; --text:#1f2937; --muted:#6b7280;
+    --border:#e5e9f0; --brand1:#1e3c72; --brand2:#2a5298; --accent:#16a085;
+    box-sizing:border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1320; --surface:#161d2e; --surface-2:#1c2438; --text:#e7ebf3; --muted:#9aa5b8; --border:#2a3348;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1320; --surface:#161d2e; --surface-2:#1c2438; --text:#e7ebf3; --muted:#9aa5b8; --border:#2a3348;
+  }
+  html{ scroll-padding-top: env(safe-area-inset-top, 0px); font-size:118%; }
+  *{ font-family:'B Nazanin','BNazanin',Tahoma,sans-serif; }
+  html,body{ height:100%; }
+  body{ background:var(--bg); color:var(--text); margin:0; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:16px; }
+  .text-muted{ color:var(--muted); }
+  .surface2{ background:var(--surface-2); }
+  input,select,textarea{
+    background:var(--surface); color:var(--text); border:1px solid var(--border);
+    border-radius:10px; padding:8px 10px; font-size:15px; outline:none;
+  }
+  input:focus,select:focus,textarea:focus{ border-color:var(--brand2); }
+  .btn{ border-radius:10px; font-weight:700; padding:9px 16px; font-size:15px; cursor:pointer; border:1px solid transparent; transition:.15s; }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:linear-gradient(120deg,var(--brand1),var(--brand2)); color:#fff; }
+  .btn-outline{ border-color:var(--border); background:var(--surface); color:var(--text); }
+  .btn-danger{ background:#e74c3c; color:#fff; }
+  .btn-ghost{ background:transparent; color:var(--muted); }
+  .chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:700; color:#fff; white-space:nowrap; }
+  .hero{ background:linear-gradient(120deg,var(--brand1),var(--brand2)); color:#fff; padding:18px 16px calc(18px + env(safe-area-inset-top,0px)) 16px; padding-top:calc(18px + env(safe-area-inset-top,0px)); }
+  .view-section.hidden{ display:none; }
+  .modal-overlay{ position:fixed; inset:0; background:rgba(10,14,24,.55); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+  @media(min-width:768px){ .modal-overlay{ align-items:center; } }
+  .modal-box{ background:var(--surface); width:100%; max-width:640px; max-height:92vh; overflow-y:auto; border-radius:20px 20px 0 0; padding:18px; }
+  @media(min-width:768px){ .modal-box{ border-radius:18px; } }
+  .modal-overlay.hidden{ display:none; }
+  .topnav-btn{ padding:10px 16px; border-radius:10px; font-size:15px; font-weight:700; color:var(--muted); cursor:pointer; }
+  .topnav-btn.active{ background:rgba(42,82,152,.12); color:var(--brand2); }
+  .bottomnav{ position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border);
+    display:flex; justify-content:space-around; padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px)) 4px; z-index:40; }
+  .bottomnav-btn{ display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; color:var(--muted); padding:4px 6px; border-radius:10px; cursor:pointer; }
+  .bottomnav-btn.active{ color:var(--brand2); font-weight:700; }
+  .bottomnav-btn .ic{ font-size:20px; }
+  ::-webkit-scrollbar{ height:8px; width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:8px; }
+  .progressbar-track{ background:var(--surface-2); border-radius:999px; height:8px; overflow:hidden; }
+  .progressbar-fill{ height:100%; background:linear-gradient(90deg,var(--accent),#27ae60); border-radius:999px; }
+  .truncate2{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .clamp2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #toast{ position:fixed; top:calc(14px + env(safe-area-inset-top,0px)); left:50%; transform:translateX(-50%); z-index:60; }
+  .toast-item{ background:#111827; color:#fff; padding:10px 18px; border-radius:12px; font-size:15px; margin-bottom:8px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+  .field-label{ font-size:14px; font-weight:700; color:var(--muted); margin-bottom:4px; display:block; }
+  .pmap-chip{ padding:6px 12px; border-radius:999px; font-size:13px; font-weight:700; white-space:nowrap; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<header class="hero">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-lg md:text-xl font-bold mb-1">📊 سامانه مدیریت نقشه پیشرفت — واحد رصد</h1>
+    <p class="text-xs md:text-sm opacity-90">گانت چارت، داشبورد و دفترچه نکات اصلاح و ارتقا — نسخه وب، سازگار با موبایل و لپ‌تاپ</p>
+  </div>
+</header>
+
+<nav class="hidden md:flex max-w-6xl mx-auto gap-1 px-4 pt-3">
+  <div class="topnav-btn" data-action="switch-tab" data-tab="dashboard">📊 داشبورد</div>
+  <div class="topnav-btn" data-action="switch-tab" data-tab="tasks">📝 فعالیت‌ها</div>
+  <div class="topnav-btn" data-action="switch-tab" data-tab="gantt">📈 گانت چارت</div>
+  <div class="topnav-btn" data-action="switch-tab" data-tab="notes">🛠️ نکات اصلاح</div>
+  <div class="topnav-btn" data-action="switch-tab" data-tab="pmap">🗺️ رصد نقشه‌های پیشرفت</div>
+  <div class="topnav-btn" data-action="switch-tab" data-tab="data">📥 داده‌ها</div>
+</nav>
+
+<main class="max-w-6xl mx-auto px-3 md:px-4 pt-3 pb-28 md:pb-12">
+  <section id="view-dashboard" class="view-section"><div id="dashboard-root"></div></section>
+  <section id="view-tasks" class="view-section hidden"><div id="tasks-root"></div></section>
+  <section id="view-gantt" class="view-section hidden"><div id="gantt-root"></div></section>
+  <section id="view-notes" class="view-section hidden"><div id="notes-root"></div></section>
+  <section id="view-pmap" class="view-section hidden"><div id="pmap-root"></div></section>
+  <section id="view-data" class="view-section hidden"><div id="data-root"></div></section>
+</main>
+
+<nav class="bottomnav md:hidden">
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="dashboard"><span class="ic">📊</span>داشبورد</div>
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="tasks"><span class="ic">📝</span>فعالیت‌ها</div>
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="gantt"><span class="ic">📈</span>گانت</div>
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="notes"><span class="ic">🛠️</span>نکات</div>
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="pmap"><span class="ic">🗺️</span>نقشه‌ها</div>
+  <div class="bottomnav-btn" data-action="switch-tab" data-tab="data"><span class="ic">📥</span>داده‌ها</div>
+</nav>
+
+<div id="taskModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" id="taskModalBox"></div>
+</div>
+<div id="noteModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" id="noteModalBox"></div>
+</div>
+<div id="ownerModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" id="ownerModalBox"></div>
+</div>
+<div id="pmActivityModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" id="pmModalBox"></div>
+</div>
+<div id="pmCountyModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" id="pmCountyModalBox"></div>
+</div>
+<div id="pmBaseModalOverlay" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:760px;">
+    <div class="flex justify-between items-center mb-3"><h3 class="font-bold">🧩 اصلاح فایل پایه (فصل‌ها و فعالیت‌ها)</h3>
+      <button class="btn btn-ghost !p-1" data-action="pmap-close-base-modal">✕</button></div>
+    <p class="text-[12px] text-muted mb-3" style="line-height:1.9;">
+      برای تغییر کلی فهرست فصل‌ها، موضوعات و فعالیت‌ها — بدون نیاز به کدنویسی — متن زیر را ویرایش کنید. این متن یک آرایهٔ JSON است؛
+      هر فعالیت باید حداقل <b>chapter</b> (نام فصل) و <b>detail</b> (شرح فعالیت) داشته باشد؛ کلیدهای <b>topic</b> (کلیات، اختیاری)،
+      <b>author</b> (مولف پیشنهادی)، <b>stageType</b> (<code>fixed</code> یا <code>staged</code>)، <b>stageLabel</b> و <b>report</b> نیز قابل تنظیم‌اند.
+    </p>
+    <div class="flex gap-2 mb-2 flex-wrap">
+      <button class="btn btn-outline" data-action="pmap-base-download">⬇️ دانلود ساختار فعلی</button>
+      <button class="btn btn-outline" data-action="pmap-base-sample">➕ نمونه یک فعالیت</button>
+    </div>
+    <textarea id="pmBaseEditorArea" style="width:100%; min-height:280px; font-family:'Courier New',monospace; font-size:12px; direction:ltr; text-align:left; border:1px solid var(--border); border-radius:10px; padding:10px; resize:vertical; background:var(--surface-2); color:var(--text);"></textarea>
+    <p id="pmBaseEditorMsg" class="text-[12px] mt-2" style="color:#e74c3c; min-height:16px;"></p>
+    <div class="flex justify-end gap-2 mt-2">
+      <button class="btn btn-outline" data-action="pmap-close-base-modal">انصراف</button>
+      <button class="btn btn-primary" data-action="pmap-base-save">جایگزینی و ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importExcelInput" accept=".xlsx" class="hidden">
+<input type="file" id="importJsonInput" accept=".json" class="hidden">
+<input type="file" id="importPmapJsonInput" accept=".json" class="hidden">
+
+<div id="authOverlay" style="position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:min(430px,100%);padding:28px">
+    <h2 style="font-size:24px;font-weight:800;margin:0 0 8px">ورود به سامانه</h2>
+    <p class="text-muted" style="margin:0 0 18px">نام کاربری و رمز خود را وارد کنید.</p>
+    <input id="authUsername" autocomplete="username" placeholder="نام کاربری" style="width:100%;margin-bottom:10px">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="رمز عبور" style="width:100%;margin-bottom:12px">
+    <button id="authLoginBtn" class="btn btn-primary" style="width:100%">ورود</button>
+    <p id="authMessage" style="min-height:22px;color:#c0392b;margin:12px 0 0"></p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://fkttzrydoimolldqqnbo.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_85hlIYMJAA705aiOqTUb0A_xCrNeQ6Z";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let cloudUser = null;
+
+function setAuthMessage(message, error = true){
+  const el = document.getElementById("authMessage");
+  if(el){ el.textContent = message || ""; el.style.color = error ? "#c0392b" : "#168a55"; }
+}
+
+async function loginToCloud(){
+  const username = document.getElementById("authUsername").value.trim();
+  const password = document.getElementById("authPassword").value;
+  if(!username || !password){ setAuthMessage("نام کاربری و رمز را وارد کنید"); return; }
+  const button = document.getElementById("authLoginBtn");
+  button.disabled = true; setAuthMessage("در حال ورود...", false);
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email: username + "@internal.local", password });
+  button.disabled = false;
+  if(error){ setAuthMessage("ورود ناموفق بود. اطلاعات را بررسی کنید."); return; }
+  cloudUser = data.user;
+  document.getElementById("authOverlay").style.display = "none";
+  await cloudLoadState();
+  loadData(); pmLoad(); showTab("dashboard");
+}
+
+function cloudPayload(){ return { tasks, notes, owners, pmActivities, pmCounties, pmProgress, pmActiveCounty, pmMeta }; }
+
+async function cloudLoadState(){
+  try{
+    const { data, error } = await supabaseClient.from("app_state").select("payload").eq("id",1).maybeSingle();
+    if(error || !data?.payload) return;
+    const p = data.payload;
+    if(Array.isArray(p.tasks)) localStorage.setItem(LS_TASKS, JSON.stringify(p.tasks));
+    if(Array.isArray(p.notes)) localStorage.setItem(LS_NOTES, JSON.stringify(p.notes));
+    if(Array.isArray(p.owners)) localStorage.setItem(LS_OWNERS, JSON.stringify(p.owners));
+    if(Array.isArray(p.pmActivities)) localStorage.setItem(LS_PM_ACTIVITIES, JSON.stringify(p.pmActivities));
+    if(Array.isArray(p.pmCounties)) localStorage.setItem(LS_PM_COUNTIES, JSON.stringify(p.pmCounties));
+    if(p.pmProgress) localStorage.setItem(LS_PM_PROGRESS, JSON.stringify(p.pmProgress));
+    if(p.pmActiveCounty) localStorage.setItem(LS_PM_ACTIVE, p.pmActiveCounty);
+    if(p.pmMeta) localStorage.setItem(LS_PM_META, JSON.stringify(p.pmMeta));
+  }catch(e){ console.warn("cloud load unavailable", e); }
+}
+
+let cloudSaveTimer;
+function queueCloudSave(){
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(async()=>{
+    if(!cloudUser) return;
+    try{ await supabaseClient.from("app_state").upsert({id:1,payload:cloudPayload(),updated_by:cloudUser.id}); }
+    catch(e){ console.warn("cloud save unavailable", e); }
+  }, 400);
+}
+
+document.getElementById("authLoginBtn").addEventListener("click", loginToCloud);
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") loginToCloud(); });
+
+function tdiv(a, b) {
+  const q = a / b;
+  return q >= 0 ? Math.floor(q) : -Math.floor(-q);
+}
+function jmod(a, b) { return a - tdiv(a, b) * b; }
+
+function jalCal(jy) {
+  const breaks = [-61,9,38,199,426,686,756,818,1111,1181,1210,1635,2060,2097,2192,2262,2324,2394,2456,3178];
+  const bl = breaks.length;
+  const gy = jy + 621;
+  let leapJ = -14;
+  let jp = breaks[0];
+  if (jy < jp || jy >= breaks[bl - 1]) throw new Error('Invalid Jalaali year ' + jy);
+  let jump = 0, jm, n;
+  for (let i = 1; i < bl; i += 1) {
+    jm = breaks[i];
+    jump = jm - jp;
+    if (jy < jm) break;
+    leapJ = leapJ + tdiv(jump, 33) * 8 + tdiv(jmod(jump, 33), 4);
+    jp = jm;
+  }
+  n = jy - jp;
+  leapJ = leapJ + tdiv(n, 33) * 8 + tdiv(jmod(n, 33) + 3, 4);
+  if (jmod(jump, 33) === 4 && jump - n === 4) leapJ += 1;
+  const leapG = tdiv(gy, 4) - tdiv((tdiv(gy, 100) + 1) * 3, 4) - 150;
+  const march = 20 + leapJ - leapG;
+  if (jump - n < 6) n = n - jump + tdiv(jump, 33) * 33;
+  let leap = jmod(jmod(n + 1, 33) - 1, 4);
+  if (leap === -1) leap = 4;
+  return { leap, gy, march };
+}
+function isLeapJalaaliYear(jy) { return jalCal(jy).leap === 0; }
+function g2d(gy, gm, gd) {
+  let d = tdiv((gy + tdiv(gm - 8, 6) + 100100) * 1461, 4) + tdiv(153 * jmod(gm + 9, 12) + 2, 5) + gd - 34840408;
+  d = d - tdiv(tdiv(gy + 100100 + tdiv(gm - 8, 6), 100) * 3, 4) + 752;
+  return d;
+}
+function d2g(jdn) {
+  let j = 4 * jdn + 139361631;
+  j = j + tdiv(tdiv(4 * jdn + 183187720, 146097) * 3, 4) * 4 - 3908;
+  const i = tdiv(jmod(j, 1461), 4) * 5 + 308;
+  const gd = tdiv(jmod(i, 153), 5) + 1;
+  const gm = jmod(tdiv(i, 153), 12) + 1;
+  const gy = tdiv(j, 1461) - 100100 + tdiv(8 - gm, 6);
+  return { gy, gm, gd };
+}
+function j2d(jy, jm, jd) {
+  const r = jalCal(jy);
+  return g2d(r.gy, 3, r.march) + (jm - 1) * 31 - tdiv(jm, 7) * (jm - 7) + jd - 1;
+}
+function d2j(jdn) {
+  const gy0 = d2g(jdn).gy;
+  let jy = gy0 - 621;
+  const r = jalCal(jy);
+  const jdn1f = g2d(r.gy, 3, r.march);
+  let k = jdn - jdn1f;
+  let jm, jd;
+  if (k >= 0) {
+    if (k <= 185) {
+      jm = 1 + tdiv(k, 31);
+      jd = jmod(k, 31) + 1;
+      return { jy, jm, jd };
+    } else {
+      k -= 186;
+    }
+  } else {
+    jy -= 1;
+    k += 179;
+    if (isLeapJalaaliYear(jy)) k += 1;
+  }
+  jm = 7 + tdiv(k, 30);
+  jd = jmod(k, 30) + 1;
+  return { jy, jm, jd };
+}
+function toJalaali(gy, gm, gd) { return d2j(g2d(gy, gm, gd)); }
+function toGregorian(jy, jm, jd) { return d2g(j2d(jy, jm, jd)); }
+
+</script>
+<script>
+/* ============================================================
+   ثابت‌ها
+============================================================ */
+const STAGES = [
+  "شناسایی و ارزیابی گروه","مسئله‌شناسی اولیه","آموزش دوره صراط پیشرفت","جمع‌آوری اطلاعات",
+  "تولید کارنامه","مسئله‌شناسی دینامیک","برنامه‌ریزی","تصویب نقشه پیشرفت منطقه",
+  "راه‌اندازی مرکز پیشرفت","پیگیری و اجرای پروژه‌ها"
+];
+const STATUS_OPTIONS = ["شروع نشده","در حال انجام","متوقف شده","انجام شده"];
+const PRIORITY_OPTIONS = ["زیاد","متوسط","کم"];
+const NOTE_TYPE_OPTIONS = ["اصلاح","ارتقا","پیشنهاد","ریسک / مسئله"];
+const NOTE_STATUS_OPTIONS = ["باز","در حال بررسی","اعمال شده","رد شده"];
+const MONTH_NAMES = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+
+const STATUS_COLORS = { "شروع نشده":"#95a5a6", "در حال انجام":"#3498db", "متوقف شده":"#e74c3c", "انجام شده":"#2ecc71" };
+const PRIORITY_COLORS = { "زیاد":"#e74c3c", "متوسط":"#f39c12", "کم":"#2ecc71" };
+const STAGE_COLORS = {
+  "شناسایی و ارزیابی گروه":"#8e44ad","مسئله‌شناسی اولیه":"#2980b9","آموزش دوره صراط پیشرفت":"#16a085",
+  "جمع‌آوری اطلاعات":"#27ae60","تولید کارنامه":"#f39c12","مسئله‌شناسی دینامیک":"#d35400",
+  "برنامه‌ریزی":"#c0392b","تصویب نقشه پیشرفت منطقه":"#2c3e50","راه‌اندازی مرکز پیشرفت":"#7f8c8d",
+  "پیگیری و اجرای پروژه‌ها":"#e67e22","نامشخص":"#bdc3c7"
+};
+const OWNER_PALETTE = ["#2980b9","#8e44ad","#16a085","#d35400","#c0392b","#27ae60","#2c3e50","#e67e22","#7f8c8d","#f39c12"];
+
+const LS_TASKS = "rasad_web_tasks_v1";
+const LS_NOTES = "rasad_web_notes_v1";
+const LS_OWNERS = "rasad_web_owners_v1";
+
+/* ============================================================
+   وضعیت برنامه
+============================================================ */
+let tasks = [];
+let notes = [];
+let owners = [];
+let currentTab = "dashboard";
+let filters = { stage:"", status:"", owner:"", search:"" };
+let noteFilters = { stage:"", status:"", search:"" };
+let taskSort = { by:"sj", dir:"asc" };
+let ganttColorBy = "owner";
+let ganttDayWidth = 22;
+let showProgressOverlay = true;
+let editingTaskId = null;
+let editingNoteId = null;
+let convertingFromNoteId = null;
+let expandedNotes = new Set();
+
+/* ============================================================
+   کمکی‌های عمومی
+============================================================ */
+function pad2(n){ return String(n).padStart(2,"0"); }
+function uid(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+  });
+}
+function todayJalali(){
+  const now = new Date();
+  const j = toJalaali(now.getFullYear(), now.getMonth()+1, now.getDate());
+  return { y:j.jy, m:j.jm, d:j.jd };
+}
+function jToDate(j){
+  const g = toGregorian(j.y, j.m, j.d);
+  return new Date(g.gy, g.gm-1, g.gd);
+}
+function jStr(j){ if(!j) return ""; return j.y + "/" + pad2(j.m) + "/" + pad2(j.d); }
+function daysDiff(d1,d2){ return Math.round((d2 - d1) / 86400000); }
+function maxDayInMonth(jy, jm){
+  if (jm <= 6) return 31;
+  if (jm <= 11) return 30;
+  try { return isLeapJalaaliYear(jy) ? 30 : 29; } catch(e){ return 29; }
+}
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+/* ============================================================
+   ذخیره‌سازی (localStorage)
+============================================================ */
+function loadData(){
+  try { tasks = JSON.parse(localStorage.getItem(LS_TASKS) || "[]"); } catch(e){ tasks = []; }
+  try { notes = JSON.parse(localStorage.getItem(LS_NOTES) || "[]"); } catch(e){ notes = []; }
+  try { owners = JSON.parse(localStorage.getItem(LS_OWNERS) || "[]"); } catch(e){ owners = []; }
+  if(!Array.isArray(tasks)) tasks = [];
+  if(!Array.isArray(notes)) notes = [];
+  if(!Array.isArray(owners)) owners = [];
+  // هر عامل انجامی که در فعالیت‌های موجود است ولی در فهرست مدیریت‌شده نیست، خودکار اضافه شود
+  const known = {};
+  owners.forEach(function(o){ known[o]=true; });
+  let changed = false;
+  tasks.forEach(function(t){
+    const o = (t.owner||"").trim();
+    if(o && !known[o]){ owners.push(o); known[o]=true; changed = true; }
+  });
+  owners.sort(function(a,b){ return a.localeCompare(b,"fa"); });
+  if(changed) saveOwners();
+}
+function saveTasks(){ try { localStorage.setItem(LS_TASKS, JSON.stringify(tasks)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+function saveNotes(){ try { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+function saveOwners(){ try { localStorage.setItem(LS_OWNERS, JSON.stringify(owners)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+
+/* ============================================================
+   Toast
+============================================================ */
+function toast(msg){
+  const wrap = document.getElementById("toast");
+  const el = document.createElement("div");
+  el.className = "toast-item";
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(function(){ el.style.opacity="0"; el.style.transition="opacity .3s"; setTimeout(function(){ el.remove(); }, 300); }, 2200);
+}
+
+/* ============================================================
+   ناوبری بین تب‌ها
+============================================================ */
+function showTab(id){
+  currentTab = id;
+  document.querySelectorAll(".view-section").forEach(function(el){ el.classList.add("hidden"); });
+  const target = document.getElementById("view-" + id);
+  if(target) target.classList.remove("hidden");
+  document.querySelectorAll(".topnav-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === id); });
+  document.querySelectorAll(".bottomnav-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === id); });
+  renderCurrent();
+  window.scrollTo(0,0);
+}
+function renderCurrent(){
+  if(currentTab === "dashboard") renderDashboard();
+  else if(currentTab === "tasks") renderTasks();
+  else if(currentTab === "gantt") renderGantt();
+  else if(currentTab === "notes") renderNotes();
+  else if(currentTab === "pmap") renderPmap();
+  else if(currentTab === "data") renderData();
+}
+
+/* ============================================================
+   فیلتر فعالیت‌ها
+============================================================ */
+function getOwnersList(){
+  return owners.slice();
+}
+function addOwner(name){
+  name = (name||"").trim();
+  if(!name){ toast("نام عامل انجام را وارد کنید"); return; }
+  if(owners.indexOf(name) !== -1){ toast("این عامل انجام قبلاً ثبت شده است"); return; }
+  owners.push(name);
+  owners.sort(function(a,b){ return a.localeCompare(b,"fa"); });
+  saveOwners();
+  toast("✅ عامل انجام اضافه شد");
+  openOwnerModal();
+  renderCurrent();
+}
+function renameOwner(oldName, newName){
+  newName = (newName||"").trim();
+  if(!newName){ toast("نام نمی‌تواند خالی باشد"); openOwnerModal(); return; }
+  if(newName !== oldName && owners.indexOf(newName) !== -1){ toast("این نام قبلاً وجود دارد"); openOwnerModal(); return; }
+  if(newName === oldName) return;
+  const idx = owners.indexOf(oldName);
+  if(idx > -1) owners[idx] = newName;
+  tasks.forEach(function(t){ if(t.owner === oldName) t.owner = newName; });
+  owners.sort(function(a,b){ return a.localeCompare(b,"fa"); });
+  saveOwners(); saveTasks();
+  toast("✅ به‌روزرسانی شد");
+  openOwnerModal();
+  renderCurrent();
+}
+function deleteOwner(name){
+  const count = tasks.filter(function(t){ return t.owner === name; }).length;
+  const msg = count>0
+    ? ("این عامل انجام در " + count + " فعالیت استفاده شده است. حذف شود؟ (نام در همان فعالیت‌ها باقی می‌ماند ولی دیگر در فهرست انتخاب/فیلتر نیست)")
+    : "این عامل انجام حذف شود؟";
+  if(!confirm(msg)) return;
+  owners = owners.filter(function(o){ return o !== name; });
+  saveOwners();
+  if(filters.owner === name) filters.owner = "";
+  toast("🗑️ عامل انجام حذف شد");
+  openOwnerModal();
+  renderCurrent();
+}
+function openOwnerModal(){
+  renderOwnerModalContent();
+  document.getElementById("ownerModalOverlay").classList.remove("hidden");
+}
+function closeOwnerModal(){
+  document.getElementById("ownerModalOverlay").classList.add("hidden");
+}
+function renderOwnerModalContent(){
+  const box = document.getElementById("ownerModalBox");
+  const list = getOwnersList();
+  box.innerHTML =
+    '<div class="flex justify-between items-center mb-4"><h3 class="font-bold">👥 مدیریت عامل‌های انجام</h3>' +
+      '<button class="btn btn-ghost !p-1" data-action="close-owner-modal">✕</button></div>' +
+    '<p class="text-[12px] text-muted mb-3">عامل‌هایی که اینجا اضافه می‌کنید، در فرم فعالیت و فیلترها به‌صورت کشویی قابل انتخاب خواهند بود.</p>' +
+    '<div class="flex gap-2 mb-4">' +
+      '<input id="new_owner_input" placeholder="نام عامل انجام جدید...">' +
+      '<button class="btn btn-primary" data-action="add-owner">➕ افزودن</button>' +
+    '</div>' +
+    '<div class="space-y-2">' +
+      (list.length===0 ? '<p class="text-muted text-sm text-center py-4">هنوز عاملی ثبت نشده است.</p>' :
+        list.map(function(o){
+          const usageCount = tasks.filter(function(t){return t.owner===o;}).length;
+          return (
+            '<div class="surface2 rounded-xl p-2 flex items-center gap-2">' +
+              '<input value="' + escapeHtml(o) + '" data-owner-rename-input="' + escapeHtml(o) + '" class="flex-1 !py-1.5">' +
+              '<span class="text-[11px] text-muted whitespace-nowrap">' + usageCount + ' فعالیت</span>' +
+              '<button class="btn btn-ghost !p-1.5" data-action="rename-owner" data-owner="' + escapeHtml(o) + '">💾</button>' +
+              '<button class="btn btn-ghost !p-1.5" data-action="delete-owner" data-owner="' + escapeHtml(o) + '">🗑️</button>' +
+            '</div>'
+          );
+        }).join("")
+      ) +
+    '</div>';
+  const input = document.getElementById("new_owner_input");
+  if(input){
+    input.addEventListener("keydown", function(e){
+      if(e.key==="Enter"){ e.preventDefault(); addOwner(input.value); }
+    });
+  }
+}
+function getFilteredTasks(){
+  return tasks.filter(function(t){
+    if(filters.stage && t.stage !== filters.stage) return false;
+    if(filters.status && t.status !== filters.status) return false;
+    if(filters.owner && t.owner !== filters.owner) return false;
+    if(filters.search && filters.search.trim()){
+      const s = filters.search.trim().toLowerCase();
+      const hay = ((t.main||"") + " " + (t.sub||"") + " " + (t.owner||"")).toLowerCase();
+      if(hay.indexOf(s) === -1) return false;
+    }
+    return true;
+  });
+}
+function getFilteredNotes(){
+  return notes.filter(function(n){
+    if(noteFilters.stage && n.stage !== noteFilters.stage) return false;
+    if(noteFilters.status && n.followStatus !== noteFilters.status) return false;
+    if(noteFilters.search && noteFilters.search.trim()){
+      const s = noteFilters.search.trim().toLowerCase();
+      const hay = ((n.title||"") + " " + (n.desc||"")).toLowerCase();
+      if(hay.indexOf(s) === -1) return false;
+    }
+    return true;
+  });
+}
+function isOverdue(t){
+  if(t.status === "انجام شده" || !t.ej) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  try { return jToDate(t.ej) < today; } catch(e){ return false; }
+}
+function daysLate(t){
+  if(!isOverdue(t)) return 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  try { return daysDiff(jToDate(t.ej), today); } catch(e){ return 0; }
+}
+function ownerColor(owner){
+  let hash = 0;
+  const s = owner || "؟";
+  for(let i=0;i<s.length;i++){ hash = s.charCodeAt(i) + ((hash<<5)-hash); }
+  return OWNER_PALETTE[Math.abs(hash) % OWNER_PALETTE.length];
+}
+function stageOrUnknown(s){ return (s && s.trim()) ? s : "نامشخص"; }
+function sortTasksList(list){
+  const field = taskSort.by === "ej" ? "ej" : "sj";
+  const dir = taskSort.dir === "desc" ? -1 : 1;
+  const sorted = list.slice();
+  sorted.sort(function(a,b){
+    const da = a[field] ? jToDate(a[field]) : new Date(8640000000000000);
+    const db = b[field] ? jToDate(b[field]) : new Date(8640000000000000);
+    return (da - db) * dir;
+  });
+  return sorted;
+}
+function taskSortOptionsHtml(){
+  const opts = [
+    ["sj_asc","تاریخ شروع (زودترین ابتدا)"], ["sj_desc","تاریخ شروع (دیرترین ابتدا)"],
+    ["ej_asc","تاریخ پایان (زودترین ابتدا)"], ["ej_desc","تاریخ پایان (دیرترین ابتدا)"]
+  ];
+  const current = taskSort.by + "_" + taskSort.dir;
+  return opts.map(function(o){ return '<option value="'+o[0]+'" '+(o[0]===current?"selected":"")+'>'+o[1]+'</option>'; }).join("");
+}
+
+/* ============================================================
+   قطعات مشترک UI
+============================================================ */
+function selectOptionsHtml(options, selected, includeEmpty, emptyLabel){
+  let html = "";
+  if(includeEmpty) html += '<option value="">' + (emptyLabel||"همه") + "</option>";
+  options.forEach(function(o){
+    html += '<option value="' + escapeHtml(o) + '" ' + (o===selected?"selected":"") + ">" + escapeHtml(o) + "</option>";
+  });
+  return html;
+}
+function taskFilterBarHtml(){
+  return (
+    '<div class="flex flex-wrap gap-2 items-center">' +
+      '<input data-filter="search" value="' + escapeHtml(filters.search) + '" placeholder="🔎 جستجو در فعالیت‌ها..." class="flex-1 min-w-[160px]">' +
+      '<select data-filter="stage" class="min-w-[140px]">' + selectOptionsHtml(STAGES, filters.stage, true, "همه مراحل") + '</select>' +
+      '<select data-filter="status" class="min-w-[120px]">' + selectOptionsHtml(STATUS_OPTIONS, filters.status, true, "همه وضعیت‌ها") + '</select>' +
+      '<select data-filter="owner" class="min-w-[120px]">' + selectOptionsHtml(getOwnersList(), filters.owner, true, "همه افراد") + '</select>' +
+    '</div>'
+  );
+}
+function noteFilterBarHtml(){
+  return (
+    '<div class="flex flex-wrap gap-2 items-center">' +
+      '<input data-nfilter="search" value="' + escapeHtml(noteFilters.search) + '" placeholder="🔎 جستجو در نکات..." class="flex-1 min-w-[160px]">' +
+      '<select data-nfilter="stage" class="min-w-[140px]">' + selectOptionsHtml(STAGES, noteFilters.stage, true, "همه مراحل") + '</select>' +
+      '<select data-nfilter="status" class="min-w-[130px]">' + selectOptionsHtml(NOTE_STATUS_OPTIONS, noteFilters.status, true, "همه وضعیت‌ها") + '</select>' +
+    '</div>'
+  );
+}
+function chip(text, color){
+  return '<span class="chip" style="background:' + color + '">' + escapeHtml(text) + '</span>';
+}
+function progressBar(pct){
+  pct = clamp(pct||0,0,100);
+  return '<div class="progressbar-track"><div class="progressbar-fill" style="width:' + pct + '%"></div></div>';
+}
+
+/* ============================================================
+   داشبورد
+============================================================ */
+function renderDashboard(){
+  const root = document.getElementById("dashboard-root");
+  const filteredTasks = getFilteredTasks();
+  const total = filteredTasks.length;
+  const done = filteredTasks.filter(function(t){return t.status==="انجام شده";}).length;
+  const doing = filteredTasks.filter(function(t){return t.status==="در حال انجام";}).length;
+  const rest = total - done - doing;
+  const overdueList = filteredTasks.filter(isOverdue);
+  const avgProgress = total ? Math.round(filteredTasks.reduce(function(a,t){return a+(t.progress||0);},0)/total) : 0;
+
+  const stageCounts = {};
+  STAGES.concat(["نامشخص"]).forEach(function(s){ stageCounts[s]=0; });
+  filteredTasks.forEach(function(t){ stageCounts[stageOrUnknown(t.stage)] = (stageCounts[stageOrUnknown(t.stage)]||0)+1; });
+  const maxStageCount = Math.max(1, ...Object.values(stageCounts));
+
+  const stageStatusRows = STAGES.concat(["نامشخص"]).map(function(stage){
+    const items = filteredTasks.filter(function(t){ return stageOrUnknown(t.stage) === stage; });
+    if(items.length===0) return "";
+    const counts = {};
+    STATUS_OPTIONS.forEach(function(s){ counts[s]=0; });
+    items.forEach(function(t){ counts[t.status] = (counts[t.status]||0)+1; });
+    const segs = STATUS_OPTIONS.map(function(s){
+      const pct = items.length ? (counts[s]/items.length*100) : 0;
+      if(pct<=0) return "";
+      return '<div style="width:' + pct + '%; background:' + STATUS_COLORS[s] + '" title="' + s + ': ' + counts[s] + '"></div>';
+    }).join("");
+    return (
+      '<div class="mb-2">' +
+        '<div class="flex justify-between text-[12px] text-muted mb-1"><span>' + escapeHtml(stage) + '</span><span>' + items.length + ' فعالیت</span></div>' +
+        '<div style="display:flex; height:10px; border-radius:6px; overflow:hidden; background:var(--surface-2)">' + segs + '</div>' +
+      '</div>'
+    );
+  }).join("");
+
+  const filterActive = filters.stage || filters.status || filters.owner || filters.search;
+  root.innerHTML =
+    '<div class="card p-3 md:p-4 mb-3">' + taskFilterBarHtml() +
+      (filterActive ? '<p class="text-[12px] text-muted mt-2">نمایش ' + total + ' فعالیت از ' + tasks.length + ' فعالیت (بر اساس فیلتر فعال)</p>' : '') +
+    '</div>' +
+    '<div class="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3 mb-3">' +
+      metricCard("🗂️","کل فعالیت‌ها", total) +
+      metricCard("✅","انجام‌شده", done) +
+      metricCard("🚧","در حال انجام", doing) +
+      metricCard("⏸️","سایر", rest) +
+      metricCard("⚠️","دارای تأخیر", overdueList.length) +
+    '</div>' +
+    '<div class="card p-4 mb-3">' +
+      '<div class="flex justify-between mb-1 text-sm"><span class="font-bold">میانگین پیشرفت کلی</span><span>' + avgProgress + '%</span></div>' +
+      progressBar(avgProgress) +
+    '</div>' +
+    '<div class="grid md:grid-cols-2 gap-3 mb-3">' +
+      '<div class="card p-4">' +
+        '<h3 class="font-bold mb-3 text-sm">📌 تعداد فعالیت به تفکیک مرحله نقشه</h3>' +
+        STAGES.concat(["نامشخص"]).filter(function(s){return stageCounts[s]>0;}).map(function(s){
+          const pct = (stageCounts[s]/maxStageCount*100);
+          return '<div class="mb-2">' +
+            '<div class="flex justify-between text-[12px] mb-1"><span class="truncate2" style="max-width:70%">' + escapeHtml(s) + '</span><span class="text-muted">' + stageCounts[s] + '</span></div>' +
+            '<div style="height:9px;border-radius:5px;background:var(--surface-2);overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + STAGE_COLORS[s] + ';border-radius:5px;"></div></div>' +
+          '</div>';
+        }).join("") + (total===0 ? '<p class="text-muted text-sm">داده‌ای وجود ندارد.</p>' : "") +
+      '</div>' +
+      '<div class="card p-4">' +
+        '<h3 class="font-bold mb-3 text-sm">📌 وضعیت فعالیت‌ها به تفکیک مرحله</h3>' +
+        '<div class="flex flex-wrap gap-2 mb-3 text-[11px]">' +
+          STATUS_OPTIONS.map(function(s){return '<span class="flex items-center gap-1"><i style="width:9px;height:9px;border-radius:3px;background:' + STATUS_COLORS[s] + ';display:inline-block"></i>' + s + '</span>';}).join("") +
+        '</div>' +
+        (stageStatusRows || '<p class="text-muted text-sm">داده‌ای وجود ندارد.</p>') +
+      '</div>' +
+    '</div>' +
+    '<div class="card p-4">' +
+      '<h3 class="font-bold mb-3 text-sm">⚠️ فعالیت‌های دارای تأخیر</h3>' +
+      (overdueList.length===0 ? '<p class="text-sm text-[--accent]">🎉 هیچ فعالیت دارای تأخیری نیست.</p>' :
+        '<div class="space-y-2">' + overdueList.sort(function(a,b){return daysLate(b)-daysLate(a);}).map(function(t){
+          return '<div class="surface2 rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer" data-action="edit-task" data-id="' + t.id + '">' +
+            '<div class="min-w-0"><div class="font-bold text-sm truncate2">' + escapeHtml(t.main) + (t.sub?(' — '+escapeHtml(t.sub)):"") + '</div>' +
+            '<div class="text-[12px] text-muted">' + escapeHtml(stageOrUnknown(t.stage)) + ' · پایان: ' + jStr(t.ej) + '</div></div>' +
+            '<div class="text-left shrink-0"><div class="chip" style="background:#e74c3c">' + daysLate(t) + ' روز تأخیر</div></div>' +
+          '</div>';
+        }).join("") + '</div>'
+      ) +
+    '</div>';
+}
+function metricCard(icon,label,value){
+  return '<div class="card p-3 text-center"><div class="text-xl">' + icon + '</div><div class="text-lg font-extrabold">' + value + '</div><div class="text-[12px] text-muted">' + label + '</div></div>';
+}
+
+/* ============================================================
+   فعالیت‌ها (جدول/کارت + افزودن/ویرایش)
+============================================================ */
+function renderTasks(){
+  const root = document.getElementById("tasks-root");
+  let list = getFilteredTasks();
+  list = sortTasksList(list);
+  root.innerHTML =
+    '<div class="card p-3 md:p-4 mb-3">' +
+      '<div class="flex flex-wrap items-center gap-2 mb-2">' +
+        '<h3 class="font-bold text-sm flex-1">📝 مدیریت فعالیت‌ها (' + list.length + ' از ' + tasks.length + ')</h3>' +
+        '<button class="btn btn-outline" data-action="open-owner-modal">👥 مدیریت عامل‌های انجام</button>' +
+        '<button class="btn btn-primary" data-action="open-task-modal">➕ افزودن فعالیت</button>' +
+      '</div>' +
+      taskFilterBarHtml() +
+      '<div class="flex items-center gap-2 mt-2">' +
+        '<span class="text-xs text-muted whitespace-nowrap">مرتب‌سازی:</span>' +
+        '<select id="task_sort_select" class="min-w-[200px]">' + taskSortOptionsHtml() + '</select>' +
+      '</div>' +
+    '</div>' +
+    '<div class="md:hidden space-y-3">' +
+      (list.length===0 ? emptyState("فعالیتی یافت نشد.") : taskCardsGroupedHtml(list)) +
+    '</div>' +
+    '<div class="hidden md:block card overflow-x-auto">' +
+      '<table class="w-full text-xs">' +
+        '<thead><tr class="text-muted border-b" style="border-color:var(--border)">' +
+          ['عامل انجام','فعالیت اصلی','ریز فعالیت','مرحله','اولویت','شروع','پایان','پیشرفت','وضعیت',''].map(function(h){return '<th class="text-right p-2 font-bold">'+h+'</th>';}).join("") +
+        '</tr></thead>' +
+        '<tbody>' + (list.length===0 ? '<tr><td colspan="10" class="p-4 text-center text-muted">فعالیتی یافت نشد.</td></tr>' : taskRowsGroupedHtml(list)) + '</tbody>' +
+      '</table>' +
+    '</div>';
+}
+function emptyState(msg){ return '<div class="card p-6 text-center text-muted text-sm">' + msg + '</div>'; }
+
+/* ---- دسته‌بندی فعالیت‌ها بر اساس فعالیت اصلی مشترک ---- */
+const GROUP_PALETTE = [
+  {bg:"rgba(41,128,185,.09)", border:"#2980b9"},
+  {bg:"rgba(142,68,173,.09)", border:"#8e44ad"},
+  {bg:"rgba(22,160,133,.09)", border:"#16a085"},
+  {bg:"rgba(230,126,34,.09)", border:"#e67e22"},
+  {bg:"rgba(39,174,96,.09)", border:"#27ae60"},
+  {bg:"rgba(211,84,0,.09)", border:"#d35400"},
+  {bg:"rgba(44,62,80,.09)", border:"#2c3e50"},
+  {bg:"rgba(192,57,43,.09)", border:"#c0392b"}
+];
+function groupColorFor(key){
+  let hash = 0;
+  for(let i=0;i<key.length;i++){ hash = key.charCodeAt(i) + ((hash<<5)-hash); }
+  return GROUP_PALETTE[Math.abs(hash) % GROUP_PALETTE.length];
+}
+function groupTasksByMain(list){
+  const map = new Map();
+  const order = [];
+  list.forEach(function(t){
+    const trimmed = (t.main||"").trim();
+    const key = trimmed ? ("m:"+trimmed) : ("u:"+t.id);
+    if(!map.has(key)){ map.set(key, []); order.push(key); }
+    map.get(key).push(t);
+  });
+  return { map:map, order:order };
+}
+
+function taskCardHtml(t){
+  const overdue = isOverdue(t);
+  return (
+    '<div class="card p-3">' +
+      '<div class="flex justify-between items-start gap-2 mb-2">' +
+        '<div class="min-w-0"><div class="font-bold text-sm truncate2">' + escapeHtml(t.main||"(بدون عنوان)") + '</div>' +
+        (t.sub ? '<div class="text-xs text-muted truncate2">' + escapeHtml(t.sub) + '</div>' : '') + '</div>' +
+        '<div class="flex gap-1 shrink-0">' +
+          '<button class="btn btn-ghost !p-1.5" data-action="edit-task" data-id="' + t.id + '">✏️</button>' +
+          '<button class="btn btn-ghost !p-1.5" data-action="delete-task" data-id="' + t.id + '">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-wrap gap-1 mb-2">' +
+        chip(stageOrUnknown(t.stage), STAGE_COLORS[stageOrUnknown(t.stage)]) +
+        chip(t.priority||"متوسط", PRIORITY_COLORS[t.priority]||"#bbb") +
+        chip(t.status, STATUS_COLORS[t.status]) +
+        (overdue ? chip(daysLate(t)+' روز تأخیر', '#e74c3c') : '') +
+      '</div>' +
+      '<div class="flex justify-between text-[12px] text-muted mb-1"><span>' + jStr(t.sj) + ' ← ' + jStr(t.ej) + '</span><span>' + (t.progress||0) + '%</span></div>' +
+      progressBar(t.progress) +
+      (t.owner ? '<div class="text-[12px] text-muted mt-2">👤 ' + escapeHtml(t.owner) + '</div>' : '') +
+    '</div>'
+  );
+}
+function subTaskCardHtml(t){
+  const overdue = isOverdue(t);
+  return (
+    '<div class="rounded-xl p-2.5" style="background:var(--surface);">' +
+      '<div class="flex justify-between items-start gap-2 mb-1">' +
+        '<div class="min-w-0 font-bold text-xs truncate2">' + (t.sub ? escapeHtml(t.sub) : '<span class="text-muted">(بدون ریز فعالیت)</span>') + '</div>' +
+        '<div class="flex gap-1 shrink-0">' +
+          '<button class="btn btn-ghost !p-1" data-action="edit-task" data-id="' + t.id + '">✏️</button>' +
+          '<button class="btn btn-ghost !p-1" data-action="delete-task" data-id="' + t.id + '">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-wrap gap-1 mb-1">' +
+        chip(t.priority||"متوسط", PRIORITY_COLORS[t.priority]||"#bbb") +
+        chip(t.status, STATUS_COLORS[t.status]) +
+        (overdue ? chip(daysLate(t)+' روز تأخیر', '#e74c3c') : '') +
+      '</div>' +
+      '<div class="flex justify-between text-[11px] text-muted mb-1"><span>' + jStr(t.sj) + ' ← ' + jStr(t.ej) + '</span><span>' + (t.progress||0) + '%</span></div>' +
+      progressBar(t.progress) +
+      (t.owner ? '<div class="text-[11px] text-muted mt-1">👤 ' + escapeHtml(t.owner) + '</div>' : '') +
+    '</div>'
+  );
+}
+function taskCardsGroupedHtml(list){
+  const groups = groupTasksByMain(list);
+  return groups.order.map(function(key){
+    const items = groups.map.get(key);
+    if(items.length <= 1) return taskCardHtml(items[0]);
+    const color = groupColorFor(key);
+    const avgProgress = Math.round(items.reduce(function(a,t){return a+(t.progress||0);},0)/items.length);
+    return (
+      '<div class="rounded-2xl p-2" style="background:'+color.bg+'; border:1.5px solid '+color.border+';">' +
+        '<div class="flex items-center justify-between gap-2 px-1.5 py-1 mb-1.5">' +
+          '<div class="flex items-center gap-2 min-w-0">' +
+            '<span style="width:10px; height:10px; border-radius:50%; background:'+color.border+'; display:inline-block; flex-shrink:0;"></span>' +
+            '<span class="font-extrabold text-sm truncate2">📁 ' + escapeHtml(items[0].main) + '</span>' +
+          '</div>' +
+          '<div class="flex items-center gap-2 shrink-0">' +
+            '<span class="text-[11px] font-bold" style="color:'+color.border+'">' + items.length + ' ریز فعالیت</span>' +
+            '<span class="text-[11px] font-bold" style="color:'+color.border+'">' + avgProgress + '%</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="space-y-2">' + items.map(subTaskCardHtml).join("") + '</div>' +
+      '</div>'
+    );
+  }).join("");
+}
+function taskRowsGroupedHtml(list){
+  const groups = groupTasksByMain(list);
+  return groups.order.map(function(key){
+    const items = groups.map.get(key);
+    if(items.length <= 1) return taskRowHtml(items[0], null);
+    const color = groupColorFor(key);
+    const avgProgress = Math.round(items.reduce(function(a,t){return a+(t.progress||0);},0)/items.length);
+    return (
+      '<tr style="background:'+color.bg+'"><td colspan="10" class="p-2 font-extrabold text-xs" style="border-right:4px solid '+color.border+'; color:'+color.border+'">' +
+        '📁 ' + escapeHtml(items[0].main) + ' — ' + items.length + ' ریز فعالیت (میانگین پیشرفت ' + avgProgress + '%)' +
+      '</td></tr>' +
+      items.map(function(t){ return taskRowHtml(t, color.border); }).join("")
+    );
+  }).join("");
+}
+function taskRowHtml(t, groupColor){
+  const overdue = isOverdue(t);
+  const firstCellStyle = groupColor ? ('border-right:4px solid '+groupColor+';') : '';
+  return (
+    '<tr class="border-b hover:bg-[var(--surface-2)]" style="border-color:var(--border)">' +
+      '<td class="p-2" style="'+firstCellStyle+'">' + escapeHtml(t.owner) + '</td>' +
+      '<td class="p-2 font-bold">' + escapeHtml(t.main) + '</td>' +
+      '<td class="p-2">' + escapeHtml(t.sub) + '</td>' +
+      '<td class="p-2">' + chip(stageOrUnknown(t.stage), STAGE_COLORS[stageOrUnknown(t.stage)]) + '</td>' +
+      '<td class="p-2">' + chip(t.priority||"متوسط", PRIORITY_COLORS[t.priority]||"#bbb") + '</td>' +
+      '<td class="p-2 whitespace-nowrap">' + jStr(t.sj) + '</td>' +
+      '<td class="p-2 whitespace-nowrap">' + jStr(t.ej) + (overdue ? ' <span class="text-red-500">⚠</span>' : '') + '</td>' +
+      '<td class="p-2 w-24"><div class="flex items-center gap-1">' + progressBar(t.progress) + '<span>' + (t.progress||0) + '%</span></div></td>' +
+      '<td class="p-2">' + chip(t.status, STATUS_COLORS[t.status]) + '</td>' +
+      '<td class="p-2 whitespace-nowrap"><button class="btn btn-ghost !p-1" data-action="edit-task" data-id="' + t.id + '">✏️</button><button class="btn btn-ghost !p-1" data-action="delete-task" data-id="' + t.id + '">🗑️</button></td>' +
+    '</tr>'
+  );
+}
+
+/* ---- فرم افزودن/ویرایش فعالیت ---- */
+function dayOptions(sel, max){
+  max = max || 31;
+  let s = "";
+  for(let d=1; d<=max; d++){ s += '<option value="'+d+'" '+(d===sel?"selected":"")+'>'+d+'</option>'; }
+  return s;
+}
+function monthOptions(sel){
+  let s = "";
+  MONTH_NAMES.forEach(function(name,i){ const v=i+1; s += '<option value="'+v+'" '+(v===sel?"selected":"")+'>'+name+'</option>'; });
+  return s;
+}
+function yearOptions(sel){
+  let s = "";
+  for(let y=1385; y<=1420; y++){ s += '<option value="'+y+'" '+(y===sel?"selected":"")+'>'+y+'</option>'; }
+  return s;
+}
+function dateSelectHtml(prefix, j){
+  j = j || todayJalali();
+  const maxD = maxDayInMonth(j.y, j.m);
+  return (
+    '<div class="flex gap-1">' +
+      '<select id="' + prefix + '_d" class="flex-1">' + dayOptions(j.d, maxD) + '</select>' +
+      '<select id="' + prefix + '_m" class="flex-[1.6]">' + monthOptions(j.m) + '</select>' +
+      '<select id="' + prefix + '_y" class="flex-1">' + yearOptions(j.y) + '</select>' +
+    '</div>'
+  );
+}
+function readDateSelect(prefix){
+  const d = parseInt(document.getElementById(prefix+"_d").value,10);
+  const m = parseInt(document.getElementById(prefix+"_m").value,10);
+  const y = parseInt(document.getElementById(prefix+"_y").value,10);
+  return { y:y, m:m, d:d };
+}
+
+function openTaskModal(id, prefill){
+  editingTaskId = id || null;
+  const t = id ? tasks.find(function(x){return x.id===id;}) : null;
+  const pf = prefill || {};
+  const today = todayJalali();
+  const box = document.getElementById("taskModalBox");
+  box.innerHTML =
+    '<div class="flex justify-between items-center mb-4"><h3 class="font-bold">' + (t?'✏️ ویرایش فعالیت':(convertingFromNoteId?'🔄 تبدیل نکته به فعالیت جدید':'➕ فعالیت جدید')) + '</h3>' +
+      '<button class="btn btn-ghost !p-1" data-action="close-task-modal">✕</button></div>' +
+    (convertingFromNoteId && !t ? '<p class="text-[12px] text-muted mb-3">فیلدها از روی نکته انتخاب‌شده پر شده‌اند؛ در صورت نیاز ویرایش کنید.</p>' : '') +
+    '<div class="grid md:grid-cols-2 gap-3">' +
+      field('عامل انجام', ownerSelectHtml(t?t.owner:(pf.owner||""))) +
+      field('فعالیت اصلی', '<input id="f_main" value="'+escapeHtml(t?t.main:(pf.main||""))+'">') +
+      field('ریز فعالیت', '<input id="f_sub" value="'+escapeHtml(t?t.sub:(pf.sub||""))+'">', 'md:col-span-2') +
+      field('مرحله نقشه پیشرفت', '<select id="f_stage"><option value="">— انتخاب کنید —</option>'+selectOptionsHtml(STAGES, t?t.stage:(pf.stage||""), false)+'</select>') +
+      field('اولویت', '<select id="f_priority">'+selectOptionsHtml(PRIORITY_OPTIONS, t?t.priority:(pf.priority||"متوسط"), false)+'</select>') +
+      field('تاریخ شروع', dateSelectHtml('f_start', t?t.sj:today)) +
+      field('تاریخ پایان', dateSelectHtml('f_end', t?t.ej:today)) +
+      field('وضعیت', '<select id="f_status">'+selectOptionsHtml(STATUS_OPTIONS, t?t.status:(pf.status||"شروع نشده"), false)+'</select>') +
+      field('پیشرفت (<span id="f_progress_label">'+(t?t.progress:0)+'</span>%)', '<input id="f_progress" type="range" min="0" max="100" step="5" value="'+(t?t.progress:0)+'" class="w-full" oninput="document.getElementById(\'f_progress_label\').textContent=this.value">') +
+      field('توضیحات', '<textarea id="f_desc" rows="2">'+escapeHtml(t?t.desc:(pf.desc||""))+'</textarea>', 'md:col-span-2') +
+    '</div>' +
+    '<div class="flex gap-2 mt-5">' +
+      '<button class="btn btn-primary flex-1" data-action="save-task">✅ ذخیره</button>' +
+      (t ? '<button class="btn btn-danger" data-action="delete-task" data-id="'+t.id+'">🗑️ حذف</button>' : '') +
+      '<button class="btn btn-outline" data-action="close-task-modal">انصراف</button>' +
+    '</div>';
+  document.getElementById("f_status").addEventListener("change", function(e){
+    if(e.target.value === "انجام شده"){ document.getElementById("f_progress").value = 100; document.getElementById("f_progress_label").textContent = "100"; }
+    if(e.target.value === "شروع نشده"){ document.getElementById("f_progress").value = 0; document.getElementById("f_progress_label").textContent = "0"; }
+  });
+  document.getElementById("taskModalOverlay").classList.remove("hidden");
+}
+function field(label, inputHtml, extraClass){
+  return '<div class="'+(extraClass||"")+'"><label class="field-label">'+label+'</label>'+inputHtml+'</div>';
+}
+function ownerSelectHtml(selected){
+  const list = getOwnersList();
+  if(list.length === 0){
+    return (
+      '<div class="text-xs text-muted flex items-center gap-2">' +
+        '<span>هنوز عاملی ثبت نشده</span>' +
+        '<button type="button" class="btn btn-outline !py-1 !px-2 text-[12px]" data-action="open-owner-modal">➕ افزودن عامل</button>' +
+      '</div>'
+    );
+  }
+  return '<select id="f_owner"><option value="">— انتخاب کنید —</option>' + selectOptionsHtml(list, selected, false) + '</select>';
+}
+function closeTaskModal(){ document.getElementById("taskModalOverlay").classList.add("hidden"); editingTaskId=null; convertingFromNoteId=null; }
+
+function saveTaskFromForm(){
+  const ownerEl = document.getElementById("f_owner");
+  const owner = ownerEl ? ownerEl.value.trim() : "";
+  const main = document.getElementById("f_main").value.trim();
+  if(!main){ toast("لطفاً عنوان «فعالیت اصلی» را وارد کنید."); return; }
+  if(getOwnersList().length && !owner){ toast("لطفاً عامل انجام را انتخاب کنید."); return; }
+  const sub = document.getElementById("f_sub").value.trim();
+  const stage = document.getElementById("f_stage").value;
+  const priority = document.getElementById("f_priority").value;
+  const sj = readDateSelect("f_start");
+  const ej = readDateSelect("f_end");
+  const status = document.getElementById("f_status").value;
+  let progress = parseInt(document.getElementById("f_progress").value,10) || 0;
+  const desc = document.getElementById("f_desc").value.trim();
+  if(status==="انجام شده") progress = 100;
+  if(status==="شروع نشده") progress = 0;
+
+  if(editingTaskId){
+    const t = tasks.find(function(x){return x.id===editingTaskId;});
+    Object.assign(t, {owner,main,sub,stage,priority,sj,ej,status,progress,desc});
+  } else {
+    const newTask = { id: uid("t"), owner,main,sub,stage,priority,sj,ej,status,progress,desc };
+    tasks.push(newTask);
+    if(convertingFromNoteId){
+      const n = notes.find(function(x){return x.id===convertingFromNoteId;});
+      if(n){ n.convertedTaskId = newTask.id; saveNotes(); }
+      convertingFromNoteId = null;
+    }
+  }
+  saveTasks();
+  closeTaskModal();
+  toast("✅ فعالیت ذخیره شد");
+  renderCurrent();
+}
+function deleteTask(id){
+  if(!confirm("آیا از حذف این فعالیت مطمئن هستید؟")) return;
+  tasks = tasks.filter(function(t){ return t.id !== id; });
+  saveTasks();
+  closeTaskModal();
+  toast("🗑️ فعالیت حذف شد");
+  renderCurrent();
+}
+
+/* ============================================================
+   گانت چارت
+============================================================ */
+function jalaliMonthsInRange(startJ, endJ){
+  const months = [];
+  let y = startJ.y, m = startJ.m;
+  const startDate = jToDate(startJ);
+  const endDate = jToDate(endJ);
+  let guard = 0;
+  while(guard < 500){
+    guard++;
+    const firstOfMonth = { y:y, m:m, d:1 };
+    const fd = jToDate(firstOfMonth);
+    months.push({ y:y, m:m, offsetDays: daysDiff(startDate, fd) });
+    if(fd >= endDate) break;
+    m += 1; if(m>12){ m=1; y+=1; }
+  }
+  return months;
+}
+function renderGantt(){
+  const root = document.getElementById("gantt-root");
+  const list = getFilteredTasks().filter(function(t){ return t.sj && t.ej; });
+  const invalid = list.filter(function(t){ return jToDate(t.sj) > jToDate(t.ej); });
+  const valid = sortTasksList(list.filter(function(t){ return jToDate(t.sj) <= jToDate(t.ej); }));
+
+  let controlsHtml =
+    '<div class="card p-3 md:p-4 mb-3">' +
+      '<div class="mb-2">' + taskFilterBarHtml() + '</div>' +
+      '<div class="flex flex-wrap items-center gap-2">' +
+        '<span class="text-xs text-muted">رنگ‌بندی:</span>' +
+        [['owner','عامل انجام'],['status','وضعیت'],['stage','مرحله نقشه'],['priority','اولویت']].map(function(pair){
+          const active = ganttColorBy===pair[0];
+          return '<button class="btn !py-1 !px-3 text-[12px] ' + (active?'btn-primary':'btn-outline') + '" data-action="gantt-color" data-value="'+pair[0]+'">'+pair[1]+'</button>';
+        }).join("") +
+        '<label class="flex items-center gap-1 text-[12px] mr-2"><input type="checkbox" id="progressOverlayToggle" '+(showProgressOverlay?"checked":"")+'> نوار پیشرفت</label>' +
+        '<span class="flex-1"></span>' +
+        '<button class="btn btn-outline !py-1 !px-3" data-action="gantt-zoom-out">➖</button>' +
+        '<button class="btn btn-outline !py-1 !px-3" data-action="gantt-zoom-in">➕</button>' +
+      '</div>' +
+    '</div>';
+
+  if(invalid.length){
+    controlsHtml += '<div class="card p-3 mb-3 border-red-300"><p class="text-red-500 text-xs font-bold mb-1">⚠️ در فعالیت‌های زیر تاریخ شروع بعد از تاریخ پایان است:</p>' +
+      invalid.map(function(t){ return '<div class="text-xs text-muted">• ' + escapeHtml(t.main) + ' (' + jStr(t.sj) + ' → ' + jStr(t.ej) + ')</div>'; }).join("") + '</div>';
+  }
+
+  if(valid.length===0){
+    root.innerHTML = controlsHtml + emptyState("فعالیتی برای نمایش در گانت چارت یافت نشد.");
+    return;
+  }
+
+  let rangeStart = valid[0].sj, rangeEnd = valid[0].ej;
+  valid.forEach(function(t){
+    if(jToDate(t.sj) < jToDate(rangeStart)) rangeStart = t.sj;
+    if(jToDate(t.ej) > jToDate(rangeEnd)) rangeEnd = t.ej;
+  });
+  const todayJ = todayJalali();
+  if(jToDate(todayJ) < jToDate(rangeStart)) rangeStart = todayJ;
+  if(jToDate(todayJ) > jToDate(rangeEnd)) rangeEnd = todayJ;
+  // padding
+  let rsD = jToDate(rangeStart); rsD.setDate(rsD.getDate()-3);
+  let reD = jToDate(rangeEnd); reD.setDate(reD.getDate()+3);
+  const rsJ = toJalaali(rsD.getFullYear(), rsD.getMonth()+1, rsD.getDate());
+  const reJ = toJalaali(reD.getFullYear(), reD.getMonth()+1, reD.getDate());
+  rangeStart = { y:rsJ.jy, m:rsJ.jm, d:rsJ.jd };
+  rangeEnd = { y:reJ.jy, m:reJ.jm, d:reJ.jd };
+
+  const rangeStartDate = jToDate(rangeStart);
+  const totalDays = daysDiff(rangeStartDate, jToDate(rangeEnd)) + 1;
+  const dayWidth = ganttDayWidth;
+  const totalWidth = totalDays * dayWidth;
+  const labelWidth = 160;
+  const rowHeight = 46;
+  const months = jalaliMonthsInRange(rangeStart, rangeEnd);
+  const todayOffset = daysDiff(rangeStartDate, jToDate(todayJ));
+
+  function colorFor(t){
+    if(ganttColorBy==="owner") return t.status==="انجام شده" ? STATUS_COLORS["انجام شده"] : ownerColor(t.owner);
+    if(ganttColorBy==="status") return STATUS_COLORS[t.status] || "#888";
+    if(ganttColorBy==="stage") return STAGE_COLORS[stageOrUnknown(t.stage)];
+    return PRIORITY_COLORS[t.priority] || "#bbb";
+  }
+
+  const rowsHtml = valid.map(function(t, idx){
+    const startOffset = daysDiff(rangeStartDate, jToDate(t.sj));
+    const durDays = daysDiff(jToDate(t.sj), jToDate(t.ej)) + 1;
+    const barLeft = startOffset * dayWidth;
+    const barWidth = Math.max(durDays * dayWidth - 3, 10);
+    const progressWidth = showProgressOverlay ? (barWidth * clamp(t.progress||0,0,100) / 100) : 0;
+    const color = colorFor(t);
+    const titleAttr = escapeHtml(t.main + (t.sub ? (' — '+t.sub) : '') + ' | ' + jStr(t.sj) + ' → ' + jStr(t.ej) + ' | ' + (t.progress||0) + '%');
+    return (
+      '<div style="position:relative; height:'+rowHeight+'px; display:flex; align-items:center; border-bottom:1px solid var(--border);">' +
+        '<div style="position:sticky; left:0; width:'+labelWidth+'px; height:100%; background:var(--surface); z-index:10; display:flex; align-items:center; padding:0 8px; border-left:1px solid var(--border); flex-shrink:0;">' +
+          '<div dir="rtl" style="text-align:right; width:100%; overflow:hidden;">' +
+            '<div class="text-xs font-bold truncate2">' + escapeHtml(t.main||"—") + '</div>' +
+            '<div class="text-[11px] text-muted truncate2">' + escapeHtml(t.sub||"") + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div title="'+titleAttr+'" data-action="edit-task" data-id="'+t.id+'" style="position:absolute; cursor:pointer; left:'+(labelWidth+barLeft)+'px; top:7px; height:'+(rowHeight-14)+'px; width:'+barWidth+'px; border-radius:8px; background:'+color+'; overflow:hidden;">' +
+          (showProgressOverlay ? '<div style="position:absolute; inset:0; width:'+progressWidth+'px; background:rgba(0,0,0,.28);"></div>' : '') +
+          (barWidth>55 ? '<div style="position:relative; color:#fff; font-size:11px; padding:0 6px; line-height:'+(rowHeight-14)+'px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'+escapeHtml(t.main)+'</div>' : '') +
+        '</div>' +
+      '</div>'
+    );
+  }).join("");
+
+  const monthLabelsHtml = months.map(function(mo){
+    return '<div style="position:absolute; top:0; bottom:0; left:'+(labelWidth+mo.offsetDays*dayWidth)+'px; border-left:1px solid var(--border); padding-left:4px; font-size:11px; color:var(--muted); white-space:nowrap;">'+MONTH_NAMES[mo.m-1]+' '+mo.y+'</div>';
+  }).join("");
+  const gridlinesHtml = months.map(function(mo){
+    return '<div style="position:absolute; top:0; bottom:0; left:'+(labelWidth+mo.offsetDays*dayWidth)+'px; width:1px; background:var(--border);"></div>';
+  }).join("");
+  const todayLineHtml = '<div style="position:absolute; top:0; bottom:0; left:'+(labelWidth+todayOffset*dayWidth)+'px; width:2px; background:#e74c3c; z-index:5;"></div>' +
+    '<div style="position:absolute; top:-2px; left:'+(labelWidth+todayOffset*dayWidth+4)+'px; font-size:11px; color:#e74c3c; font-weight:700; white-space:nowrap;">امروز ('+jStr(todayJ)+')</div>';
+
+  root.innerHTML = controlsHtml +
+    '<div class="card p-2 md:p-3">' +
+      '<div dir="ltr" class="overflow-x-auto rounded-xl" style="border:1px solid var(--border)">' +
+        '<div style="position:relative; width:'+(labelWidth+totalWidth)+'px; min-width:100%;">' +
+          '<div style="position:relative; height:30px; border-bottom:1px solid var(--border);">' +
+            '<div style="position:sticky; left:0; width:'+labelWidth+'px; height:100%; background:var(--surface); z-index:20; display:flex; align-items:center; padding:0 8px; border-left:1px solid var(--border);">' +
+              '<span dir="rtl" style="font-size:12px; font-weight:700;">فعالیت‌ها</span>' +
+            '</div>' +
+            monthLabelsHtml +
+          '</div>' +
+          '<div style="position:relative; height:'+(valid.length*rowHeight+20)+'px;">' +
+            gridlinesHtml + todayLineHtml + rowsHtml +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<p class="text-[11px] text-muted mt-2">💡 روی هر میله ضربه بزنید تا جزئیات آن فعالیت را ویرایش کنید. برای دیدن ماه‌های بیشتر، به چپ/راست پیمایش کنید.</p>' +
+    '</div>';
+}
+
+/* ============================================================
+   نکات اصلاح و ارتقا
+============================================================ */
+function convertNoteToTask(noteId){
+  const n = notes.find(function(x){return x.id===noteId;});
+  if(!n) return;
+  convertingFromNoteId = noteId;
+  openTaskModal(null, { main:n.title, sub:"", stage:n.stage, desc:n.desc, owner:"", priority:"متوسط", status:"شروع نشده" });
+}
+function noteIsResolved(n){
+  const linked = n.convertedTaskId && tasks.some(function(t){ return t.id === n.convertedTaskId; });
+  return !!linked || n.followStatus === "اعمال شده";
+}
+function renderNotes(){
+  const root = document.getElementById("notes-root");
+  const list = getFilteredNotes();
+  const total = notes.length;
+  const open = notes.filter(function(n){return n.followStatus==="باز";}).length;
+  const applied = notes.filter(function(n){return n.followStatus==="اعمال شده";}).length;
+
+  const activeNotes = [];
+  const resolvedNotes = [];
+  list.slice().reverse().forEach(function(n){
+    if(noteIsResolved(n)) resolvedNotes.push(n); else activeNotes.push(n);
+  });
+
+  root.innerHTML =
+    '<div class="card p-3 md:p-4 mb-3">' +
+      '<div class="flex flex-wrap items-center gap-2 mb-2">' +
+        '<h3 class="font-bold text-sm flex-1">🛠️ دفترچه نکات اصلاح و ارتقا</h3>' +
+        '<button class="btn btn-primary" data-action="open-note-modal">➕ افزودن نکته</button>' +
+      '</div>' +
+      noteFilterBarHtml() +
+    '</div>' +
+    '<div class="grid grid-cols-3 gap-2 mb-3">' +
+      metricCard("🗒️","کل نکات", total) + metricCard("🟡","باز", open) + metricCard("✅","اعمال‌شده", applied) +
+    '</div>' +
+    '<div class="space-y-2">' +
+      (activeNotes.length===0 && resolvedNotes.length===0 ? emptyState("نکته‌ای یافت نشد.") :
+        activeNotes.map(noteCardHtml).join("") +
+        (resolvedNotes.length>0 ?
+          '<div class="flex items-center gap-2 my-3">' +
+            '<span class="text-[12px] text-muted font-bold whitespace-nowrap">✅ نکات انجام‌شده / تبدیل‌شده به فعالیت (' + resolvedNotes.length + ')</span>' +
+            '<div class="flex-1" style="border-top:1px solid var(--border)"></div>' +
+          '</div>' + resolvedNotes.map(noteCardHtml).join("")
+          : "")
+      ) +
+    '</div>';
+}
+function noteCardHtml(n){
+  const typeColors = { "اصلاح":"#e67e22","ارتقا":"#2980b9","پیشنهاد":"#16a085","ریسک / مسئله":"#c0392b" };
+  const statusColors = { "باز":"#f39c12","در حال بررسی":"#3498db","اعمال شده":"#2ecc71","رد شده":"#95a5a6" };
+  const linkedTask = n.convertedTaskId ? tasks.find(function(t){return t.id===n.convertedTaskId;}) : null;
+  const desc = n.desc || "";
+  const isLong = desc.length > 220;
+  const expanded = expandedNotes.has(n.id);
+  const shownDesc = (!isLong || expanded) ? escapeHtml(desc) : escapeHtml(desc.slice(0,220)) + "…";
+
+  let convertBlockHtml;
+  if(n.convertedTaskId && linkedTask){
+    convertBlockHtml =
+      '<div class="flex flex-wrap items-center gap-2 mt-2">' + chip("✅ تبدیل به فعالیت شده", "#2ecc71") +
+        '<button class="text-[12px] underline text-muted" data-action="edit-task" data-id="'+linkedTask.id+'">مشاهده فعالیت</button>' +
+      '</div>';
+  } else if(n.convertedTaskId && !linkedTask){
+    convertBlockHtml =
+      '<div class="flex flex-wrap items-center gap-2 mt-2">' + chip("⚠️ فعالیت مرتبط حذف شده", "#e67e22") +
+        '<button class="btn btn-outline !py-1 !px-2 text-[12px]" data-action="convert-note-to-task" data-id="'+n.id+'">➕ تبدیل مجدد</button>' +
+      '</div>';
+  } else {
+    convertBlockHtml =
+      '<div class="mt-2"><button class="btn btn-outline !py-1 !px-2 text-[12px]" data-action="convert-note-to-task" data-id="'+n.id+'">➕ تبدیل به فعالیت</button></div>';
+  }
+
+  return (
+    '<div class="card p-3">' +
+      '<div class="flex justify-between items-start gap-2 mb-2">' +
+        '<div class="min-w-0"><div class="font-bold text-sm clamp2" style="overflow-wrap:anywhere;">' + escapeHtml(n.title) + '</div>' +
+        '<div class="text-[12px] text-muted">' + escapeHtml(stageOrUnknown(n.stage)) + ' · ' + jStr(n.cj) + (n.author?(' · '+escapeHtml(n.author)):'') + '</div></div>' +
+        '<div class="flex gap-1 shrink-0">' +
+          '<button class="btn btn-ghost !p-1.5" data-action="edit-note" data-id="' + n.id + '">✏️</button>' +
+          '<button class="btn btn-ghost !p-1.5" data-action="delete-note" data-id="' + n.id + '">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-wrap gap-1 mb-2">' + chip(n.noteType, typeColors[n.noteType]||"#888") + chip(n.followStatus, statusColors[n.followStatus]||"#888") + '</div>' +
+      (desc ? '<p class="text-xs text-muted" style="white-space:pre-wrap; overflow-wrap:anywhere;">' + shownDesc + '</p>' : '') +
+      (isLong ? '<button class="text-[12px] mt-1" style="color:var(--brand2); text-decoration:underline;" data-action="toggle-note-expand" data-id="'+n.id+'">' + (expanded?"نمایش کمتر":"نمایش کامل متن") + '</button>' : '') +
+      convertBlockHtml +
+    '</div>'
+  );
+}
+function openNoteModal(id){
+  editingNoteId = id || null;
+  const n = id ? notes.find(function(x){return x.id===id;}) : null;
+  const today = todayJalali();
+  const box = document.getElementById("noteModalBox");
+  box.innerHTML =
+    '<div class="flex justify-between items-center mb-4"><h3 class="font-bold">' + (n?'✏️ ویرایش نکته':'➕ نکته جدید') + '</h3>' +
+      '<button class="btn btn-ghost !p-1" data-action="close-note-modal">✕</button></div>' +
+    '<div class="grid md:grid-cols-2 gap-3">' +
+      field('مرحله نقشه پیشرفت', '<select id="n_stage">'+selectOptionsHtml(STAGES, n?n.stage:STAGES[0], false)+'</select>') +
+      field('نوع یادداشت', '<select id="n_type">'+selectOptionsHtml(NOTE_TYPE_OPTIONS, n?n.noteType:NOTE_TYPE_OPTIONS[0], false)+'</select>') +
+      field('عنوان', '<input id="n_title" value="'+escapeHtml(n?n.title:"")+'">', 'md:col-span-2') +
+      field('شرح', '<textarea id="n_desc" rows="5">'+escapeHtml(n?n.desc:"")+'</textarea>', 'md:col-span-2') +
+      field('ثبت‌کننده', '<input id="n_author" value="'+escapeHtml(n?n.author:"")+'">') +
+      field('تاریخ ثبت', dateSelectHtml('n_date', n?n.cj:today)) +
+      field('وضعیت پیگیری', '<select id="n_status">'+selectOptionsHtml(NOTE_STATUS_OPTIONS, n?n.followStatus:"باز", false)+'</select>') +
+    '</div>' +
+    '<div class="flex gap-2 mt-5">' +
+      '<button class="btn btn-primary flex-1" data-action="save-note">✅ ذخیره</button>' +
+      (n ? '<button class="btn btn-danger" data-action="delete-note" data-id="'+n.id+'">🗑️ حذف</button>' : '') +
+      '<button class="btn btn-outline" data-action="close-note-modal">انصراف</button>' +
+    '</div>';
+  document.getElementById("noteModalOverlay").classList.remove("hidden");
+}
+function closeNoteModal(){ document.getElementById("noteModalOverlay").classList.add("hidden"); editingNoteId=null; }
+function saveNoteFromForm(){
+  const title = document.getElementById("n_title").value.trim();
+  if(!title){ toast("لطفاً عنوان نکته را وارد کنید."); return; }
+  const stage = document.getElementById("n_stage").value;
+  const noteType = document.getElementById("n_type").value;
+  const desc = document.getElementById("n_desc").value.trim();
+  const author = document.getElementById("n_author").value.trim();
+  const cj = readDateSelect("n_date");
+  const followStatus = document.getElementById("n_status").value;
+
+  if(editingNoteId){
+    const n = notes.find(function(x){return x.id===editingNoteId;});
+    Object.assign(n, {stage,noteType,title,desc,author,cj,followStatus});
+  } else {
+    notes.push({ id: uid("n"), stage,noteType,title,desc,author,cj,followStatus });
+  }
+  saveNotes();
+  closeNoteModal();
+  toast("✅ نکته ذخیره شد");
+  renderCurrent();
+}
+function deleteNote(id){
+  if(!confirm("آیا از حذف این نکته مطمئن هستید؟")) return;
+  notes = notes.filter(function(n){ return n.id !== id; });
+  saveNotes();
+  closeNoteModal();
+  toast("🗑️ نکته حذف شد");
+  renderCurrent();
+}
+
+/* ============================================================
+   داده‌ها (خروجی/ورودی)
+============================================================ */
+function renderData(){
+  const root = document.getElementById("data-root");
+  const total = tasks.length, done = tasks.filter(function(t){return t.status==="انجام شده";}).length;
+  const overdue = tasks.filter(isOverdue).length;
+  root.innerHTML =
+    '<div class="card p-4 mb-3">' +
+      '<h3 class="font-bold mb-2 text-sm">📊 خلاصه وضعیت</h3>' +
+      '<p class="text-xs text-muted leading-6">' +
+        'از مجموع <b>' + total + '</b> فعالیت، <b>' + done + '</b> مورد انجام شده و <b>' + overdue + '</b> مورد دارای تأخیر است.<br>' +
+        'تعداد نکات اصلاح/ارتقای ثبت‌شده: <b>' + notes.length + '</b>' +
+      '</p>' +
+    '</div>' +
+    '<div class="card p-4 mb-3">' +
+      '<h3 class="font-bold mb-1 text-sm">📥 خروجی اکسل</h3>' +
+      '<p class="text-[12px] text-muted mb-3">فایل اکسل با ستون‌های همسان با نسخه دسکتاپ (Streamlit) — برای انتقال داده بین دو نسخه.</p>' +
+      '<div class="flex flex-wrap gap-2">' +
+        '<button class="btn btn-outline" data-action="export-excel">⬇️ دانلود اکسل کامل (فعالیت‌ها + نکات)</button>' +
+        '<button class="btn btn-outline" data-action="import-excel-trigger">⬆️ بارگذاری از فایل اکسل</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card p-4 mb-3">' +
+      '<h3 class="font-bold mb-1 text-sm">💾 پشتیبان‌گیری (JSON)</h3>' +
+      '<p class="text-[12px] text-muted mb-3">داده‌ها فقط در همین مرورگر ذخیره می‌شوند. برای انتقال به دستگاه دیگر یا نگهداری نسخه پشتیبان، از این گزینه استفاده کنید.</p>' +
+      '<div class="flex flex-wrap gap-2">' +
+        '<button class="btn btn-outline" data-action="export-json">⬇️ دانلود نسخه پشتیبان (JSON)</button>' +
+        '<button class="btn btn-outline" data-action="import-json-trigger">⬆️ بازیابی از فایل پشتیبان</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card p-4">' +
+      '<h3 class="font-bold mb-1 text-sm text-red-500">⚠️ پاک‌سازی داده‌ها</h3>' +
+      '<p class="text-[12px] text-muted mb-3">همه فعالیت‌ها و نکات این مرورگر حذف می‌شود. قبل از این کار حتماً پشتیبان بگیرید.</p>' +
+      '<button class="btn btn-danger" data-action="clear-all-data">🗑️ حذف همه داده‌ها</button>' +
+    '</div>';
+}
+
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function exportJson(){
+  const payload = { tasks: tasks, notes: notes, exportedAt: new Date().toISOString() };
+  downloadBlob(JSON.stringify(payload, null, 2), "rasad_backup.json", "application/json");
+  toast("⬇️ فایل پشتیبان دانلود شد");
+}
+function importJsonFile(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      let addedT = 0, addedN = 0;
+      if(Array.isArray(data.tasks)){
+        data.tasks.forEach(function(t){ if(t && t.id && !tasks.some(function(x){return x.id===t.id;})){ tasks.push(t); addedT++; } });
+      }
+      if(Array.isArray(data.notes)){
+        data.notes.forEach(function(n){ if(n && n.id && !notes.some(function(x){return x.id===n.id;})){ notes.push(n); addedN++; } });
+      }
+      saveTasks(); saveNotes();
+      toast("✅ " + addedT + " فعالیت و " + addedN + " نکته وارد شد");
+      renderCurrent();
+    } catch(err){
+      toast("❌ فایل پشتیبان نامعتبر است");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function taskDateFromJStr(s){
+  if(!s) return null;
+  const parts = String(s).split("/");
+  if(parts.length!==3) return null;
+  const y = parseInt(parts[0],10), m = parseInt(parts[1],10), d = parseInt(parts[2],10);
+  if(!y||!m||!d) return null;
+  return { y:y, m:m, d:d };
+}
+function exportExcel(){
+  const taskRows = tasks.map(function(t){
+    return {
+      "عامل انجام": t.owner||"", "فعالیت اصلی": t.main||"", "ریز فعالیت": t.sub||"",
+      "مرحله نقشه": t.stage||"", "اولویت": t.priority||"", "تاریخ شروع": jStr(t.sj), "تاریخ پایان": jStr(t.ej),
+      "پیشرفت": t.progress||0, "وضعیت": t.status||"", "توضیحات": t.desc||""
+    };
+  });
+  const noteRows = notes.map(function(n){
+    return {
+      "مرحله نقشه": n.stage||"", "نوع یادداشت": n.noteType||"", "عنوان": n.title||"", "شرح": n.desc||"",
+      "وضعیت پیگیری": n.followStatus||"", "تاریخ ثبت": jStr(n.cj), "ثبت‌کننده": n.author||""
+    };
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskRows), "فعالیت‌ها");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(noteRows), "نکات اصلاح و ارتقا");
+  XLSX.writeFile(wb, "Rasad_Full_Report.xlsx");
+  toast("⬇️ فایل اکسل دانلود شد");
+}
+function importExcelFile(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:"array"});
+      let addedT = 0, addedN = 0;
+      wb.SheetNames.forEach(function(sheetName){
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
+        rows.forEach(function(r){
+          if(r["فعالیت اصلی"] !== undefined){
+            const sj = taskDateFromJStr(r["تاریخ شروع"]) || todayJalali();
+            const ej = taskDateFromJStr(r["تاریخ پایان"]) || todayJalali();
+            const dup = tasks.find(function(x){ return x.owner===String(r["عامل انجام"]||"") && x.main===String(r["فعالیت اصلی"]||"") && x.sub===String(r["ریز فعالیت"]||""); });
+            const obj = {
+              id: dup ? dup.id : uid("t"),
+              owner:String(r["عامل انجام"]||""), main:String(r["فعالیت اصلی"]||""), sub:String(r["ریز فعالیت"]||""),
+              stage:String(r["مرحله نقشه"]||""), priority:String(r["اولویت"]||"متوسط"),
+              sj:sj, ej:ej, progress:parseInt(r["پیشرفت"],10)||0, status:String(r["وضعیت"]||"شروع نشده"), desc:String(r["توضیحات"]||"")
+            };
+            if(dup) Object.assign(dup, obj); else { tasks.push(obj); addedT++; }
+          } else if(r["عنوان"] !== undefined){
+            const cj = taskDateFromJStr(r["تاریخ ثبت"]) || todayJalali();
+            notes.push({
+              id: uid("n"), stage:String(r["مرحله نقشه"]||""), noteType:String(r["نوع یادداشت"]||NOTE_TYPE_OPTIONS[0]),
+              title:String(r["عنوان"]||""), desc:String(r["شرح"]||""), followStatus:String(r["وضعیت پیگیری"]||"باز"),
+              cj:cj, author:String(r["ثبت‌کننده"]||"")
+            });
+            addedN++;
+          }
+        });
+      });
+      saveTasks(); saveNotes();
+      toast("✅ " + addedT + " فعالیت و " + addedN + " نکته از اکسل وارد شد");
+      renderCurrent();
+    } catch(err){
+      toast("❌ خواندن فایل اکسل ناموفق بود");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function clearAllData(){
+  if(!confirm("همه فعالیت‌ها و نکات حذف می‌شود. مطمئن هستید؟")) return;
+  tasks = []; notes = [];
+  saveTasks(); saveNotes();
+  toast("🗑️ همه داده‌ها حذف شد");
+  renderCurrent();
+}
+
+/* ============================================================
+   رصد نقشه‌های پیشرفت — پورت کامل امکانات اپ
+   «مدیریت پروژه نگاشت نقشه پیشرفت» (شهرستان‌ها/فصل‌ها/فعالیت‌ها/پیشرفت)
+   همگام با فایل JSON آن اپ، به‌علاوه مدیریت مستقل در همین‌جا
+============================================================ */
+const LS_PM_ACTIVITIES = "rasad_pm_activities_v1";
+const LS_PM_COUNTIES   = "rasad_pm_counties_v1";
+const LS_PM_PROGRESS   = "rasad_pm_progress_v1";
+const LS_PM_ACTIVE     = "rasad_pm_active_county_v1";
+const LS_PM_META       = "rasad_pm_meta_v1";
+
+const PM_STATUS_META = {
+  not_started: { label:"انجام‌نشده", color:"#95a5a6" },
+  in_progress: { label:"در حال انجام", color:"#3498db" },
+  done:        { label:"انجام‌شده", color:"#2ecc71" }
+};
+const PM_BUGGY_TOPIC = "مدت زمان تدوین نقشه پیشرفت";
+
+let pmActivities = [];
+let pmCounties = [];
+let pmProgress = {};
+let pmActiveCounty = "";
+let pmMeta = null;
+let pmCollapsed = new Set();
+let pmAllExpanded = true;
+let pmFilters = { search:"", chapter:"", author:"", stage:"", report:"", track:"" };
+let pmEditingId = null;
+
+/* ---- رفع باگ: «مدت زمان تدوین نقشه پیشرفت» به‌اشتباه از فصل اول
+   به‌عنوان کلیات (topic) همه ردیف‌های فصل‌های بعدی کپی شده بود ---- */
+function pmRepairTopicBug(list){
+  let firstChapter = null;
+  list.forEach(function(a){
+    if(a.topic === PM_BUGGY_TOPIC && firstChapter === null) firstChapter = a.chapter;
+  });
+  if(firstChapter === null) return list;
+  return list.map(function(a){
+    if(a.topic === PM_BUGGY_TOPIC && a.chapter !== firstChapter){
+      return Object.assign({}, a, { topic:"" });
+    }
+    return a;
+  });
+}
+function pmNormalizeActivities(list){
+  if(!Array.isArray(list)) return [];
+  let maxId = 0;
+  list.forEach(function(a){ if(typeof a.id === "number" && a.id > maxId) maxId = a.id; });
+  const seen = {};
+  const out = list.map(function(a){
+    const o = Object.assign({}, a);
+    if(typeof o.id !== "number" || seen[o.id]){ maxId += 1; o.id = maxId; }
+    seen[o.id] = true;
+    o.chapter = String(o.chapter||"").trim();
+    o.topic = o.topic == null ? "" : String(o.topic).trim();
+    o.detail = String(o.detail||"").trim();
+    o.author = String(o.author||"").trim();
+    o.report = String(o.report||"").trim();
+    o.stageType = (o.stageType === "fixed") ? "fixed" : "staged";
+    o.stageLabel = o.stageType === "fixed" ? "ثابت (زمان صفر)" : String(o.stageLabel||"نامشخص").trim();
+    return o;
+  });
+  return pmRepairTopicBug(out);
+}
+
+/* ---- ذخیره‌سازی ---- */
+function pmLoad(){
+  try { pmActivities = JSON.parse(localStorage.getItem(LS_PM_ACTIVITIES) || "[]"); } catch(e){ pmActivities = []; }
+  try { pmCounties = JSON.parse(localStorage.getItem(LS_PM_COUNTIES) || "[]"); } catch(e){ pmCounties = []; }
+  try { pmProgress = JSON.parse(localStorage.getItem(LS_PM_PROGRESS) || "{}"); } catch(e){ pmProgress = {}; }
+  try { pmMeta = JSON.parse(localStorage.getItem(LS_PM_META) || "null"); } catch(e){ pmMeta = null; }
+  if(!Array.isArray(pmActivities)) pmActivities = [];
+  if(!Array.isArray(pmCounties)) pmCounties = [];
+  if(typeof pmProgress !== "object" || !pmProgress) pmProgress = {};
+  const repaired = pmNormalizeActivities(pmActivities);
+  const changed = JSON.stringify(repaired) !== JSON.stringify(pmActivities);
+  pmActivities = repaired;
+  pmActiveCounty = localStorage.getItem(LS_PM_ACTIVE) || pmCounties[0] || "";
+  if(pmCounties.length && pmCounties.indexOf(pmActiveCounty) === -1) pmActiveCounty = pmCounties[0];
+  pmCounties.forEach(pmEnsureCountyProgress);
+  if(changed) pmSaveAll();
+}
+function pmSaveAll(){
+  try {
+    localStorage.setItem(LS_PM_ACTIVITIES, JSON.stringify(pmActivities));
+    localStorage.setItem(LS_PM_COUNTIES, JSON.stringify(pmCounties));
+    localStorage.setItem(LS_PM_PROGRESS, JSON.stringify(pmProgress));
+    localStorage.setItem(LS_PM_ACTIVE, pmActiveCounty || "");
+    localStorage.setItem(LS_PM_META, JSON.stringify(pmMeta || null));
+  } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); }
+}
+function pmEnsureCountyProgress(county){
+  if(!county) return;
+  if(!pmProgress[county]) pmProgress[county] = {};
+  pmActivities.forEach(function(a){
+    if(!pmProgress[county][a.id]){
+      pmProgress[county][a.id] = { status: a.stageType==="fixed" ? "done" : "not_started", assignee:"", note:"", updatedAt:"" };
+    }
+  });
+}
+function pmEntry(county, id){
+  const c = pmProgress[county] || {};
+  return c[id] || { status:"not_started", assignee:"", note:"", updatedAt:"" };
+}
+function pmSetEntryField(county, id, field, value){
+  if(!county) { toast("ابتدا یک شهرستان انتخاب یا اضافه کنید"); return; }
+  if(!pmProgress[county]) pmProgress[county] = {};
+  if(!pmProgress[county][id]) pmProgress[county][id] = { status:"not_started", assignee:"", note:"", updatedAt:"" };
+  pmProgress[county][id][field] = value;
+  pmProgress[county][id].updatedAt = jStr(todayJalali());
+  pmSaveAll();
+  renderCurrent();
+}
+function pmSetChapterBulkStatus(chapter, status){
+  if(!pmActiveCounty){ toast("ابتدا یک شهرستان انتخاب یا اضافه کنید"); return; }
+  if(!status) return;
+  pmActivities.filter(function(a){ return a.chapter === chapter; }).forEach(function(a){
+    if(!pmProgress[pmActiveCounty]) pmProgress[pmActiveCounty] = {};
+    if(!pmProgress[pmActiveCounty][a.id]) pmProgress[pmActiveCounty][a.id] = { status:"not_started", assignee:"", note:"", updatedAt:"" };
+    pmProgress[pmActiveCounty][a.id].status = status;
+    pmProgress[pmActiveCounty][a.id].updatedAt = jStr(todayJalali());
+  });
+  pmSaveAll();
+  toast("✅ وضعیت کل فصل به‌روزرسانی شد");
+  renderCurrent();
+}
+
+/* ---- آمار ---- */
+function pmComputeStats(county, list){
+  list = list || pmActivities;
+  let total=0, done=0, inprog=0, notstarted=0, fixed=0, staged=0, stagedDone=0;
+  list.forEach(function(a){
+    total++;
+    const e = pmEntry(county, a.id);
+    if(e.status === "done") done++;
+    else if(e.status === "in_progress") inprog++;
+    else notstarted++;
+    if(a.stageType === "fixed") fixed++;
+    else { staged++; if(e.status === "done") stagedDone++; }
+  });
+  return { total, done, inprog, notstarted, fixed, staged, stagedDone,
+    pctAll: total ? Math.round(done/total*100) : 0,
+    pctStaged: staged ? Math.round(stagedDone/staged*100) : 0 };
+}
+function pmRingSVG(pct, size, stroke, color, trackColor){
+  const r = (size-stroke)/2, c = 2*Math.PI*r, off = c - (pct/100)*c, cx = size/2, cy = size/2;
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">' +
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+trackColor+'" stroke-width="'+stroke+'"/>' +
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+cx+' '+cy+')"/>' +
+  '</svg>';
+}
+function pmUniq(arr){ return Array.from(new Set(arr.filter(function(v){ return v!==undefined && v!==null && v!==""; }))).sort(function(a,b){ return String(a).localeCompare(String(b),"fa"); }); }
+function pmOrderedChapters(list){
+  const seen = [];
+  list.forEach(function(a){ if(seen.indexOf(a.chapter) === -1) seen.push(a.chapter); });
+  return seen;
+}
+function pmGetFilteredActivities(){
+  return pmActivities.filter(function(a){
+    if(pmFilters.chapter && a.chapter !== pmFilters.chapter) return false;
+    if(pmFilters.author && a.author !== pmFilters.author) return false;
+    if(pmFilters.stage && a.stageLabel !== pmFilters.stage) return false;
+    if(pmFilters.report && a.report !== pmFilters.report) return false;
+    if(pmFilters.track){
+      const e = pmEntry(pmActiveCounty, a.id);
+      if(e.status !== pmFilters.track) return false;
+    }
+    if(pmFilters.search && pmFilters.search.trim()){
+      const s = pmFilters.search.trim().toLowerCase();
+      const hay = ((a.topic||"") + " " + (a.detail||"") + " " + (a.author||"")).toLowerCase();
+      if(hay.indexOf(s) === -1) return false;
+    }
+    return true;
+  });
+}
+
+/* ---- مدیریت شهرستان‌ها (کشویی + مودال مدیریت، برای وقتی تعداد زیاد شد) ---- */
+function pmAddCounty(name){
+  name = (name||"").trim();
+  if(!name){ toast("نام شهرستان را وارد کنید"); return; }
+  if(pmCounties.indexOf(name) !== -1){ toast("این شهرستان قبلاً ثبت شده است"); return; }
+  pmCounties.push(name);
+  pmEnsureCountyProgress(name);
+  if(!pmActiveCounty) pmActiveCounty = name;
+  pmSaveAll();
+  toast("✅ شهرستان اضافه شد");
+  renderPmCountyModalContent();
+  renderCurrent();
+}
+function pmRenameCounty(oldName, newName){
+  newName = (newName||"").trim();
+  if(!newName){ toast("نام نمی‌تواند خالی باشد"); renderPmCountyModalContent(); return; }
+  if(newName !== oldName && pmCounties.indexOf(newName) !== -1){ toast("این نام قبلاً وجود دارد"); renderPmCountyModalContent(); return; }
+  if(newName === oldName) return;
+  const idx = pmCounties.indexOf(oldName);
+  if(idx > -1) pmCounties[idx] = newName;
+  if(pmProgress[oldName]){ pmProgress[newName] = pmProgress[oldName]; delete pmProgress[oldName]; }
+  if(pmActiveCounty === oldName) pmActiveCounty = newName;
+  pmSaveAll();
+  toast("✅ به‌روزرسانی شد");
+  renderPmCountyModalContent();
+  renderCurrent();
+}
+function pmDeleteCounty(name){
+  if(pmCounties.length <= 1){ toast("حداقل یک شهرستان باید باقی بماند"); return; }
+  if(!confirm('شهرستان «' + name + '» و همه اطلاعات پیشرفت آن حذف شود؟')) return;
+  pmCounties = pmCounties.filter(function(c){ return c !== name; });
+  delete pmProgress[name];
+  if(pmActiveCounty === name) pmActiveCounty = pmCounties[0] || "";
+  pmSaveAll();
+  toast("🗑️ شهرستان حذف شد");
+  renderPmCountyModalContent();
+  renderCurrent();
+}
+function openPmCountyModal(){
+  renderPmCountyModalContent();
+  document.getElementById("pmCountyModalOverlay").classList.remove("hidden");
+}
+function closePmCountyModal(){ document.getElementById("pmCountyModalOverlay").classList.add("hidden"); }
+function renderPmCountyModalContent(){
+  const box = document.getElementById("pmCountyModalBox");
+  box.innerHTML =
+    '<div class="flex justify-between items-center mb-4"><h3 class="font-bold">🏘️ مدیریت شهرستان‌ها</h3>' +
+      '<button class="btn btn-ghost !p-1" data-action="pmap-close-county-modal">✕</button></div>' +
+    '<p class="text-[12px] text-muted mb-3">اگر تعداد شهرستان‌ها زیاد شود، همین‌جا قابل جست‌وجو، تغییر نام و حذف هستند و در فهرست کشویی بالای صفحه نمایش داده می‌شوند.</p>' +
+    '<div class="flex gap-2 mb-4">' +
+      '<input id="new_pmcounty_input" placeholder="نام شهرستان جدید...">' +
+      '<button class="btn btn-primary" data-action="pmap-add-county">➕ افزودن</button>' +
+    '</div>' +
+    '<div class="space-y-2" style="max-height:340px; overflow-y:auto;">' +
+      (pmCounties.length===0 ? '<p class="text-muted text-sm text-center py-4">هنوز شهرستانی ثبت نشده است.</p>' :
+        pmCounties.map(function(c){
+          const s = pmComputeStats(c);
+          return (
+            '<div class="surface2 rounded-xl p-2 flex items-center gap-2">' +
+              '<input value="' + escapeHtml(c) + '" data-pmcounty-rename-input="' + escapeHtml(c) + '" class="flex-1 !py-1.5">' +
+              '<span class="text-[11px] text-muted whitespace-nowrap">' + s.pctAll + '٪</span>' +
+              '<button class="btn btn-ghost !p-1.5" data-action="pmap-rename-county" data-county="' + escapeHtml(c) + '">💾</button>' +
+              '<button class="btn btn-ghost !p-1.5" data-action="pmap-delete-county" data-county="' + escapeHtml(c) + '">🗑️</button>' +
+            '</div>'
+          );
+        }).join("")
+      ) +
+    '</div>';
+  const input = document.getElementById("new_pmcounty_input");
+  if(input){
+    input.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); pmAddCounty(input.value); } });
+  }
+}
+
+/* ---- مودال فعالیت (افزودن/ویرایش فعالیت پایه) ---- */
+function pmStageOptionsHtml(){
+  return '<option value="staged">مرحله شماره‌دار</option><option value="fixed">ثابت (زمان صفر)</option>';
+}
+function openPmActivityModal(id){
+  pmEditingId = id || null;
+  const a = id ? pmActivities.find(function(x){ return x.id === id; }) : null;
+  document.getElementById("pmModalBox").innerHTML =
+    '<div class="flex justify-between items-center mb-4"><h3 class="font-bold">' + (a ? "ویرایش فعالیت" : "فعالیت جدید") + '</h3>' +
+      '<button class="btn btn-ghost !p-1" data-action="pmap-close-activity-modal">✕</button></div>' +
+    '<div class="space-y-3">' +
+      '<div><label class="field-label">فصل</label><input id="pm_f_chapter" list="pmChapterOptions" value="' + escapeHtml(a?a.chapter:"") + '" placeholder="نام فصل را وارد یا انتخاب کنید" class="w-full">' +
+        '<datalist id="pmChapterOptions">' + pmOrderedChapters(pmActivities).map(function(ch){ return '<option value="'+escapeHtml(ch)+'">'; }).join("") + '</datalist></div>' +
+      '<div><label class="field-label">کلیات (عنوان موضوع)</label><input id="pm_f_topic" value="' + escapeHtml(a?a.topic:"") + '" placeholder="اختیاری — در صورت نبود، جزییات به‌عنوان عنوان نمایش داده می‌شود" class="w-full"></div>' +
+      '<div><label class="field-label">جزییات (شرح فعالیت)</label><textarea id="pm_f_detail" rows="3" class="w-full">' + escapeHtml(a?a.detail:"") + '</textarea></div>' +
+      '<div class="grid grid-cols-2 gap-2">' +
+        '<div><label class="field-label">مولف پیشنهادی</label><input id="pm_f_author" list="pmAuthorOptions" value="' + escapeHtml(a?a.author:"") + '" class="w-full">' +
+          '<datalist id="pmAuthorOptions">' + pmUniq(pmActivities.map(function(x){return x.author;})).map(function(v){ return '<option value="'+escapeHtml(v)+'">'; }).join("") + '</datalist></div>' +
+        '<div><label class="field-label">نوع گزارش</label><input id="pm_f_report" list="pmReportOptions" value="' + escapeHtml(a?a.report:"") + '" class="w-full">' +
+          '<datalist id="pmReportOptions">' + pmUniq(pmActivities.map(function(x){return x.report;})).map(function(v){ return '<option value="'+escapeHtml(v)+'">'; }).join("") + '</datalist></div>' +
+      '</div>' +
+      '<div class="grid grid-cols-2 gap-2">' +
+        '<div><label class="field-label">زمان ثبت و جمع‌آوری داده</label><select id="pm_f_stagetype" class="w-full">' + pmStageOptionsHtml() + '</select></div>' +
+        '<div id="pm_f_stagelabel_wrap"><label class="field-label">شماره مرحله و عنوان</label><input id="pm_f_stagelabel" value="' + escapeHtml(a?a.stageLabel:"") + '" placeholder="مثال: 4- پایان جمع‌آوری اطلاعات" class="w-full"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="flex justify-between items-center gap-2 mt-4">' +
+      (a ? '<button class="btn btn-danger" data-action="pmap-delete-activity">حذف فعالیت</button>' : '<span></span>') +
+      '<div class="flex gap-2"><button class="btn btn-outline" data-action="pmap-close-activity-modal">انصراف</button><button class="btn btn-primary" data-action="pmap-save-activity">ذخیره</button></div>' +
+    '</div>';
+  const stEl = document.getElementById("pm_f_stagetype");
+  stEl.value = a ? a.stageType : "staged";
+  const wrapEl = document.getElementById("pm_f_stagelabel_wrap");
+  if(wrapEl) wrapEl.style.display = (stEl.value === "fixed") ? "none" : "";
+  document.getElementById("pmActivityModalOverlay").classList.remove("hidden");
+}
+function closePmActivityModal(){ document.getElementById("pmActivityModalOverlay").classList.add("hidden"); pmEditingId = null; }
+function savePmActivityFromForm(){
+  const chapter = document.getElementById("pm_f_chapter").value.trim();
+  const topic = document.getElementById("pm_f_topic").value.trim();
+  const detail = document.getElementById("pm_f_detail").value.trim();
+  const author = document.getElementById("pm_f_author").value.trim();
+  const report = document.getElementById("pm_f_report").value.trim();
+  const stageType = document.getElementById("pm_f_stagetype").value;
+  const stageLabel = stageType === "fixed" ? "ثابت (زمان صفر)" : (document.getElementById("pm_f_stagelabel").value.trim() || "نامشخص");
+  if(!chapter || !detail){ toast("فصل و جزییات فعالیت را وارد کنید"); return; }
+  if(pmEditingId){
+    const a = pmActivities.find(function(x){ return x.id === pmEditingId; });
+    Object.assign(a, { chapter, topic, detail, author, report, stageType, stageLabel });
+    toast("✅ فعالیت ویرایش شد");
+  } else {
+    const newId = pmActivities.length ? Math.max.apply(null, pmActivities.map(function(x){return x.id;})) + 1 : 1;
+    pmActivities.push({ id:newId, chapter, topic, detail, author, report, stageType, stageLabel });
+    pmCounties.forEach(pmEnsureCountyProgress);
+    toast("✅ فعالیت جدید افزوده شد");
+  }
+  pmSaveAll();
+  closePmActivityModal();
+  renderCurrent();
+}
+function deletePmActivity(){
+  if(!pmEditingId) return;
+  if(!confirm("این فعالیت برای همه شهرستان‌ها حذف شود؟")) return;
+  const id = pmEditingId;
+  pmActivities = pmActivities.filter(function(a){ return a.id !== id; });
+  Object.keys(pmProgress).forEach(function(c){ if(pmProgress[c]) delete pmProgress[c][id]; });
+  pmSaveAll();
+  closePmActivityModal();
+  toast("🗑️ فعالیت حذف شد");
+  renderCurrent();
+}
+
+/* ---- اصلاح فایل پایه (ویرایش یکجای فهرست فعالیت‌ها) ---- */
+function openPmBaseModal(){
+  document.getElementById("pmBaseEditorArea").value = JSON.stringify(pmActivities, null, 2);
+  document.getElementById("pmBaseEditorMsg").textContent = "";
+  document.getElementById("pmBaseModalOverlay").classList.remove("hidden");
+}
+function closePmBaseModal(){ document.getElementById("pmBaseModalOverlay").classList.add("hidden"); }
+function pmBaseDownload(){
+  const blob = new Blob([JSON.stringify(pmActivities, null, 2)], {type:"application/json;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "ساختار-فعالیت‌های-پایه.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function pmBaseInsertSample(){
+  const ta = document.getElementById("pmBaseEditorArea");
+  const sample = { chapter:"نام فصل", topic:"", detail:"شرح فعالیت", author:"مولف پیشنهادی", stageType:"staged", stageLabel:"4- پایان جمع‌آوری اطلاعات", report:"نوع گزارش" };
+  ta.value = ta.value.trim().length ? ta.value : "[]";
+  try{
+    const arr = JSON.parse(ta.value);
+    arr.push(sample);
+    ta.value = JSON.stringify(arr, null, 2);
+  } catch(e){
+    ta.value += "\n" + JSON.stringify(sample, null, 2);
+  }
+}
+function pmBaseSave(){
+  const msg = document.getElementById("pmBaseEditorMsg");
+  let arr;
+  try { arr = JSON.parse(document.getElementById("pmBaseEditorArea").value); }
+  catch(e){ msg.textContent = "❌ متن واردشده JSON معتبر نیست."; return; }
+  if(!Array.isArray(arr)){ msg.textContent = "❌ باید یک آرایه از فعالیت‌ها باشد."; return; }
+  for(const a of arr){
+    if(!a.chapter || !a.detail){ msg.textContent = "❌ هر فعالیت باید حداقل chapter و detail داشته باشد."; return; }
+  }
+  pmActivities = pmNormalizeActivities(arr);
+  pmCounties.forEach(pmEnsureCountyProgress);
+  pmSaveAll();
+  closePmBaseModal();
+  toast("✅ فهرست فعالیت‌های پایه جایگزین شد");
+  renderCurrent();
+}
+
+/* ---- خروجی و ورودی JSON ---- */
+function pmExportJson(){
+  const data = { version: (pmMeta && pmMeta.version) || 1, exportedAt: jStr(todayJalali()), activities: pmActivities, counties: pmCounties, progress: pmProgress, activeCounty: pmActiveCounty };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "نگاشت-پیشرفت-" + jStr(todayJalali()).replace(/\//g,"-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast("⬇️ فایل JSON دانلود شد");
+}
+function pmImportJsonFile(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!Array.isArray(data.activities) || !Array.isArray(data.counties) || typeof data.progress !== "object"){
+        throw new Error("ساختار فایل نامعتبر است");
+      }
+      pmActivities = pmNormalizeActivities(data.activities);
+      pmCounties = data.counties.length ? data.counties : [];
+      pmProgress = data.progress || {};
+      pmActiveCounty = (data.activeCounty && pmCounties.indexOf(data.activeCounty) !== -1) ? data.activeCounty : (pmCounties[0] || "");
+      pmMeta = { version: data.version || 1, exportedAt: data.exportedAt || "", importedAt: jStr(todayJalali()) };
+      pmCounties.forEach(pmEnsureCountyProgress);
+      pmSaveAll();
+      toast("✅ اطلاعات رصد نقشه‌های پیشرفت به‌روزرسانی شد");
+      renderCurrent();
+    } catch(err){
+      toast("❌ فایل JSON نامعتبر است");
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+/* ---- خروجی اکسل: کامل و فقط انجام‌نشده‌ها ---- */
+function pmExcelHeaderRow(){
+  return ["ردیف","فصل","کلیات","جزییات","مولف پیشنهادی","مرحله نقشه","نوع گزارش","وضعیت پیشرفت","مسئول انجام","یادداشت","آخرین به‌روزرسانی"];
+}
+function pmExportExcel(){
+  if(typeof XLSX === "undefined"){ toast("⚠️ کتابخانه خروجی اکسل بارگذاری نشد"); return; }
+  const wb = XLSX.utils.book_new();
+  pmCounties.forEach(function(county){
+    const rows = [pmExcelHeaderRow()];
+    pmActivities.forEach(function(a,i){
+      const e = pmEntry(county, a.id);
+      rows.push([i+1, a.chapter||"", a.topic||"", a.detail||"", a.author||"", a.stageLabel||"", a.report||"", (PM_STATUS_META[e.status]||{}).label||"", e.assignee||"", e.note||"", e.updatedAt||""]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:22},{wch:24},{wch:34},{wch:16},{wch:22},{wch:20},{wch:14},{wch:16},{wch:26},{wch:16}];
+    ws['!rtl'] = true;
+    XLSX.utils.book_append_sheet(wb, ws, String(county||"Sheet").replace(/[\\/*?:\[\]]/g,"").slice(0,31) || "Sheet");
+  });
+  const summaryRows = [["شهرستان","کل ردیف‌ها","انجام‌شده","در حال انجام","انجام‌نشده","پیشرفت کل (٪)","پیشرفت اقلام زمان‌بر (٪)"]];
+  pmCounties.forEach(function(county){
+    const s = pmComputeStats(county);
+    summaryRows.push([county, s.total, s.done, s.inprog, s.notstarted, s.pctAll, s.pctStaged]);
+  });
+  const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSum['!rtl'] = true;
+  XLSX.utils.book_append_sheet(wb, wsSum, "خلاصه وضعیت");
+  XLSX.writeFile(wb, "گزارش-نگاشت-پیشرفت.xlsx");
+  toast("⬇️ فایل اکسل (کامل) دانلود شد");
+}
+function pmExportExcelNotDone(){
+  if(typeof XLSX === "undefined"){ toast("⚠️ کتابخانه خروجی اکسل بارگذاری نشد"); return; }
+  const county = pmActiveCounty;
+  if(!county){ toast("ابتدا یک شهرستان انتخاب یا اضافه کنید"); return; }
+  const wb = XLSX.utils.book_new();
+  const rows = [pmExcelHeaderRow()];
+  let idx = 0;
+  pmActivities.forEach(function(a){
+    const e = pmEntry(county, a.id);
+    if(e.status === "done") return;
+    idx++;
+    rows.push([idx, a.chapter||"", a.topic||"", a.detail||"", a.author||"", a.stageLabel||"", a.report||"", (PM_STATUS_META[e.status]||{}).label||"", e.assignee||"", e.note||"", e.updatedAt||""]);
+  });
+  if(idx === 0){ toast("همه فعالیت‌های شهرستان «" + county + "» انجام‌شده است"); return; }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:22},{wch:24},{wch:34},{wch:16},{wch:22},{wch:20},{wch:14},{wch:16},{wch:26},{wch:16}];
+  ws['!rtl'] = true;
+  const safeCounty = String(county||"Sheet").replace(/[\\/*?:\[\]]/g,"").slice(0,31) || "Sheet";
+  XLSX.utils.book_append_sheet(wb, ws, safeCounty);
+  const fileSafeCounty = String(county||"").replace(/[\\/*?:"<>|]/g,"").trim();
+  XLSX.writeFile(wb, "گزارش فعالیت های انجام نشده - شهرستان " + fileSafeCounty + ".xlsx");
+  toast("⬇️ فایل اکسل (انجام‌نشده‌های «" + county + "») دانلود شد");
+}
+function pmClearData(){
+  if(!confirm("همه اطلاعات بخش رصد نقشه‌های پیشرفت پاک شود؟")) return;
+  pmActivities = []; pmCounties = []; pmProgress = {}; pmActiveCounty = ""; pmMeta = null;
+  pmCollapsed = new Set(); pmFilters = { search:"", chapter:"", author:"", stage:"", report:"", track:"" };
+  pmSaveAll();
+  toast("🗑️ اطلاعات پاک شد");
+  renderCurrent();
+}
+
+/* ---- رندر ---- */
+function pmActivityTitleParts(a){
+  const title = a.topic ? a.topic : (a.detail || "(بدون عنوان)");
+  const sub = (a.topic && a.detail && a.detail !== a.topic) ? a.detail : "";
+  return { title, sub };
+}
+function pmStatCard(label, value, color, pct){
+  return (
+    '<div class="surface2 rounded-xl p-2.5">' +
+      '<div class="text-[12px] text-muted mb-1">' + label + '</div>' +
+      '<div class="text-lg font-extrabold mb-1" style="color:' + color + '">' + value + '</div>' +
+      (pct !== undefined ? progressBar(pct) : '') +
+    '</div>'
+  );
+}
+function pmActivityRowHtml(a){
+  const e = pmEntry(pmActiveCounty, a.id);
+  const meta = PM_STATUS_META[e.status] || PM_STATUS_META.not_started;
+  const parts = pmActivityTitleParts(a);
+  return (
+    '<div class="rounded-xl p-2.5" style="background:var(--surface-2);">' +
+      '<div class="flex justify-between items-start gap-2 mb-1">' +
+        '<div class="min-w-0"><div class="font-bold text-xs truncate2">' + escapeHtml(parts.title) + '</div>' +
+        (parts.sub ? '<div class="text-[11px] text-muted clamp2">' + escapeHtml(parts.sub) + '</div>' : '') + '</div>' +
+        '<div class="flex items-center gap-1 shrink-0">' +
+          chip(meta.label, meta.color) +
+          '<button class="btn btn-ghost !p-1" data-action="pmap-edit-activity" data-id="' + a.id + '">✏️</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-wrap gap-2 text-[11px] text-muted mb-2">' +
+        (a.stageLabel ? '<span>⏱️ ' + escapeHtml(a.stageLabel) + '</span>' : '') +
+        (a.report ? '<span>📄 ' + escapeHtml(a.report) + '</span>' : '') +
+        (a.author ? '<span>👤 ' + escapeHtml(a.author) + '</span>' : '') +
+      '</div>' +
+      '<div class="grid grid-cols-1 md:grid-cols-3 gap-1.5">' +
+        '<select data-pm-field="status" data-pm-id="' + a.id + '">' +
+          Object.keys(PM_STATUS_META).map(function(k){ return '<option value="'+k+'" '+(e.status===k?"selected":"")+'>'+PM_STATUS_META[k].label+'</option>'; }).join("") +
+        '</select>' +
+        '<input data-pm-field="assignee" data-pm-id="' + a.id + '" placeholder="مسئول انجام" value="' + escapeHtml(e.assignee||"") + '">' +
+        '<input data-pm-field="note" data-pm-id="' + a.id + '" placeholder="یادداشت" value="' + escapeHtml(e.note||"") + '">' +
+      '</div>' +
+      (e.updatedAt ? '<div class="text-[10px] text-muted mt-1">آخرین به‌روزرسانی: ' + escapeHtml(e.updatedAt) + '</div>' : '') +
+    '</div>'
+  );
+}
+function renderPmap(){
+  const root = document.getElementById("pmap-root");
+  if(!root) return;
+  if(!pmActivities.length){
+    root.innerHTML =
+      '<div class="card p-6 text-center">' +
+        '<div class="text-3xl mb-2">🗺️</div>' +
+        '<h3 class="font-bold mb-2">رصد نقشه‌های پیشرفت</h3>' +
+        '<p class="text-sm text-muted mb-4">این بخش با فایل خروجی JSON اپ «مدیریت پروژه نگاشت نقشه پیشرفت» همگام می‌شود، یا می‌توانید فعالیت‌های پایه را همین‌جا بسازید.</p>' +
+        '<div class="flex flex-wrap gap-2 justify-center">' +
+          '<button class="btn btn-primary" data-action="pmap-import-trigger">📥 بارگذاری فایل JSON</button>' +
+          '<button class="btn btn-outline" data-action="pmap-open-base-modal">🧩 ساخت دستی فهرست فعالیت‌ها</button>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+  if(pmCounties.length && (!pmActiveCounty || pmCounties.indexOf(pmActiveCounty) === -1)) pmActiveCounty = pmCounties[0];
+  const stats = pmComputeStats(pmActiveCounty);
+  const list = pmGetFilteredActivities();
+  const chapters = pmOrderedChapters(list);
+  const allChapters = pmOrderedChapters(pmActivities);
+
+  const header =
+    '<div class="card p-3 md:p-4 mb-3">' +
+      '<div class="flex flex-wrap items-center gap-2 mb-3">' +
+        '<h3 class="font-bold text-sm flex-1">🗺️ رصد نقشه‌های پیشرفت</h3>' +
+        (pmMeta && pmMeta.exportedAt ? '<span class="text-[11px] text-muted">آخرین خروجی برنامه اصلی: ' + escapeHtml(pmMeta.exportedAt) + '</span>' : '') +
+      '</div>' +
+      '<div class="flex flex-wrap gap-2 mb-3">' +
+        '<button class="btn btn-outline" data-action="pmap-import-trigger">📥 بارگذاری JSON</button>' +
+        '<button class="btn btn-outline" data-action="pmap-export-json">💾 ذخیره در JSON</button>' +
+        '<button class="btn btn-outline" data-action="pmap-export-excel">⬇️ خروجی اکسل (کامل)</button>' +
+        '<button class="btn btn-outline" data-action="pmap-export-excel-notdone">⏳ خروجی اکسل (انجام‌نشده‌ها)</button>' +
+        '<button class="btn btn-outline" data-action="pmap-open-base-modal">🧩 اصلاح فایل پایه</button>' +
+        '<button class="btn btn-primary" data-action="pmap-add-activity">➕ فعالیت جدید</button>' +
+        '<button class="btn btn-danger" data-action="pmap-clear-data">🗑️ پاک‌سازی</button>' +
+      '</div>' +
+      '<div class="flex flex-wrap items-center gap-2 mb-3">' +
+        '<span class="field-label !mb-0">شهرستان:</span>' +
+        (pmCounties.length === 0 ?
+          '<span class="text-[12px] text-muted">هنوز شهرستانی ثبت نشده — از دکمه مدیریت شهرستان‌ها اضافه کنید.</span>' :
+          '<select id="pmCountySelect" class="min-w-[180px]">' +
+            pmCounties.map(function(c){ return '<option value="'+escapeHtml(c)+'" '+(c===pmActiveCounty?"selected":"")+'>'+escapeHtml(c)+' — '+pmComputeStats(c).pctAll+'٪</option>'; }).join("") +
+          '</select>'
+        ) +
+        '<button class="btn btn-outline" data-action="pmap-manage-counties">🏘️ مدیریت شهرستان‌ها (' + pmCounties.length + ')</button>' +
+      '</div>' +
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">' +
+        pmStatCard("پیشرفت کل سند (شامل اقلام ثابت)", stats.pctAll + '٪ <span class="text-[11px] font-normal text-muted">(' + stats.done + ' از ' + stats.total + ')</span>', "#1e3c72", stats.pctAll) +
+        pmStatCard("پیشرفت اقلام زمان‌بر (مرحله‌دار)", stats.pctStaged + '٪ <span class="text-[11px] font-normal text-muted">(' + stats.stagedDone + ' از ' + stats.staged + ')</span>', "#16a085", stats.pctStaged) +
+        pmStatCard("در حال انجام", stats.inprog, "#3498db") +
+        pmStatCard("انجام‌نشده", stats.notstarted, "#95a5a6") +
+      '</div>' +
+      '<div class="mb-1"><div class="text-[12px] text-muted mb-1.5">پیشرفت به تفکیک فصل — شهرستان «' + escapeHtml(pmActiveCounty||"—") + '»</div>' +
+        '<div class="space-y-1.5">' +
+          allChapters.map(function(ch){
+            const chStats = pmComputeStats(pmActiveCounty, pmActivities.filter(function(a){ return a.chapter===ch; }));
+            return '<div class="flex items-center gap-2 text-[11px]"><span class="text-muted w-36 truncate2" title="'+escapeHtml(ch)+'">'+escapeHtml(ch)+'</span><div class="flex-1">'+progressBar(chStats.pctAll)+'</div><span class="w-10 text-left">'+chStats.pctAll+'٪</span></div>';
+          }).join("") +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  const filterBar =
+    '<div class="card p-3 md:p-4 mb-3">' +
+      '<div class="flex flex-wrap gap-2 mb-2">' +
+        '<input data-pmfilter="search" placeholder="جست‌وجو در کلیات / جزییات..." class="flex-1 min-w-[160px]" value="' + escapeHtml(pmFilters.search) + '">' +
+        '<select data-pmfilter="chapter"><option value="">همه فصل‌ها</option>' + pmOrderedChapters(pmActivities).map(function(ch){ return '<option value="'+escapeHtml(ch)+'" '+(pmFilters.chapter===ch?"selected":"")+'>'+escapeHtml(ch)+'</option>'; }).join("") + '</select>' +
+        '<select data-pmfilter="author"><option value="">همه مولفین</option>' + pmUniq(pmActivities.map(function(a){return a.author;})).map(function(v){ return '<option value="'+escapeHtml(v)+'" '+(pmFilters.author===v?"selected":"")+'>'+escapeHtml(v)+'</option>'; }).join("") + '</select>' +
+      '</div>' +
+      '<div class="flex flex-wrap gap-2">' +
+        '<select data-pmfilter="stage"><option value="">همه مراحل</option>' + pmUniq(pmActivities.map(function(a){return a.stageLabel;})).map(function(v){ return '<option value="'+escapeHtml(v)+'" '+(pmFilters.stage===v?"selected":"")+'>'+escapeHtml(v)+'</option>'; }).join("") + '</select>' +
+        '<select data-pmfilter="report"><option value="">همه گزارش‌ها</option>' + pmUniq(pmActivities.map(function(a){return a.report;})).map(function(v){ return '<option value="'+escapeHtml(v)+'" '+(pmFilters.report===v?"selected":"")+'>'+escapeHtml(v)+'</option>'; }).join("") + '</select>' +
+        '<select data-pmfilter="track"><option value="">همه وضعیت‌ها</option>' + Object.keys(PM_STATUS_META).map(function(k){ return '<option value="'+k+'" '+(pmFilters.track===k?"selected":"")+'>'+PM_STATUS_META[k].label+'</option>'; }).join("") + '</select>' +
+        '<button class="btn btn-ghost" data-action="pmap-reset-filters">پاک کردن فیلترها</button>' +
+        '<button class="btn btn-outline mr-auto" data-action="pmap-toggle-expand-all">' + (pmAllExpanded ? "▲ بستن همه فصل‌ها" : "▼ باز کردن همه فصل‌ها") + '</button>' +
+      '</div>' +
+    '</div>';
+
+  const chaptersHtml = list.length === 0 ? emptyState("فعالیتی با این فیلترها یافت نشد.") :
+    chapters.map(function(ch){
+      const items = list.filter(function(a){ return a.chapter === ch; });
+      const allInChapter = pmActivities.filter(function(a){ return a.chapter === ch; });
+      const chStats = pmComputeStats(pmActiveCounty, allInChapter);
+      const collapsed = pmCollapsed.has(ch);
+      return (
+        '<div class="card p-3 mb-2">' +
+          '<div class="flex flex-wrap justify-between items-center gap-2">' +
+            '<div class="flex items-center gap-2 cursor-pointer min-w-0" data-action="pmap-toggle-chapter" data-chapter="' + escapeHtml(ch) + '">' +
+              '<span class="text-muted">' + (collapsed ? '◀' : '▼') + '</span>' +
+              '<span class="font-bold text-sm truncate2">📖 ' + escapeHtml(ch||"بدون فصل") + '</span>' +
+              '<span class="text-muted text-xs whitespace-nowrap">' + allInChapter.length + ' فعالیت · ' + chStats.done + ' انجام‌شده · ' + chStats.pctAll + '٪</span>' +
+            '</div>' +
+            '<select data-pmchapterbulk="' + escapeHtml(ch) + '" class="text-xs" onclick="event.stopPropagation()">' +
+              '<option value="">علامت‌گذاری کل فصل...</option>' +
+              '<option value="done">همه: انجام‌شده</option><option value="in_progress">همه: در حال انجام</option><option value="not_started">همه: انجام‌نشده</option>' +
+            '</select>' +
+          '</div>' +
+          (collapsed ? '' : '<div class="mt-2 space-y-2">' + items.map(pmActivityRowHtml).join("") + '</div>') +
+        '</div>'
+      );
+    }).join("");
+
+  root.innerHTML = header + filterBar + chaptersHtml;
+}
+
+/* ============================================================
+   رویدادهای عمومی (Delegation)
+============================================================ */
+document.addEventListener("click", function(e){
+  const el = e.target.closest("[data-action]");
+  if(!el) return;
+  const action = el.dataset.action;
+  const id = el.dataset.id;
+  if(action==="switch-tab") showTab(el.dataset.tab);
+  else if(action==="open-task-modal") openTaskModal(null);
+  else if(action==="edit-task") openTaskModal(id);
+  else if(action==="delete-task") deleteTask(id);
+  else if(action==="close-task-modal") closeTaskModal();
+  else if(action==="save-task") saveTaskFromForm();
+  else if(action==="open-note-modal") openNoteModal(null);
+  else if(action==="edit-note") openNoteModal(id);
+  else if(action==="delete-note") deleteNote(id);
+  else if(action==="close-note-modal") closeNoteModal();
+  else if(action==="save-note") saveNoteFromForm();
+  else if(action==="convert-note-to-task") convertNoteToTask(id);
+  else if(action==="toggle-note-expand"){
+    if(expandedNotes.has(id)) expandedNotes.delete(id); else expandedNotes.add(id);
+    renderCurrent();
+  }
+  else if(action==="gantt-color"){ ganttColorBy = el.dataset.value; renderGantt(); }
+  else if(action==="gantt-zoom-in"){ ganttDayWidth = clamp(ganttDayWidth+6,10,54); renderGantt(); }
+  else if(action==="gantt-zoom-out"){ ganttDayWidth = clamp(ganttDayWidth-6,10,54); renderGantt(); }
+  else if(action==="open-owner-modal") openOwnerModal();
+  else if(action==="close-owner-modal") closeOwnerModal();
+  else if(action==="add-owner"){
+    const inp = document.getElementById("new_owner_input");
+    addOwner(inp ? inp.value : "");
+  }
+  else if(action==="rename-owner"){
+    const inp = document.querySelector('[data-owner-rename-input="' + CSS.escape(el.dataset.owner) + '"]');
+    renameOwner(el.dataset.owner, inp ? inp.value : el.dataset.owner);
+  }
+  else if(action==="delete-owner") deleteOwner(el.dataset.owner);
+  else if(action==="export-json") exportJson();
+  else if(action==="import-json-trigger") document.getElementById("importJsonInput").click();
+  else if(action==="export-excel") exportExcel();
+  else if(action==="import-excel-trigger") document.getElementById("importExcelInput").click();
+  else if(action==="clear-all-data") clearAllData();
+  else if(action==="pmap-import-trigger") document.getElementById("importPmapJsonInput").click();
+  else if(action==="pmap-export-json") pmExportJson();
+  else if(action==="pmap-export-excel") pmExportExcel();
+  else if(action==="pmap-export-excel-notdone") pmExportExcelNotDone();
+  else if(action==="pmap-clear-data") pmClearData();
+  else if(action==="pmap-toggle-chapter"){
+    if(pmCollapsed.has(el.dataset.chapter)) pmCollapsed.delete(el.dataset.chapter); else pmCollapsed.add(el.dataset.chapter);
+    renderCurrent();
+  }
+  else if(action==="pmap-toggle-expand-all"){
+    pmAllExpanded = !pmAllExpanded;
+    pmCollapsed = pmAllExpanded ? new Set() : new Set(pmOrderedChapters(pmActivities));
+    renderCurrent();
+  }
+  else if(action==="pmap-reset-filters"){ pmFilters = { search:"", chapter:"", author:"", stage:"", report:"", track:"" }; renderCurrent(); }
+  else if(action==="pmap-add-activity") openPmActivityModal(null);
+  else if(action==="pmap-edit-activity") openPmActivityModal(parseInt(id,10));
+  else if(action==="pmap-close-activity-modal") closePmActivityModal();
+  else if(action==="pmap-save-activity") savePmActivityFromForm();
+  else if(action==="pmap-delete-activity") deletePmActivity();
+  else if(action==="pmap-manage-counties") openPmCountyModal();
+  else if(action==="pmap-close-county-modal") closePmCountyModal();
+  else if(action==="pmap-add-county"){
+    const inp = document.getElementById("new_pmcounty_input");
+    pmAddCounty(inp ? inp.value : "");
+  }
+  else if(action==="pmap-rename-county"){
+    const inp = document.querySelector('[data-pmcounty-rename-input="' + CSS.escape(el.dataset.county) + '"]');
+    pmRenameCounty(el.dataset.county, inp ? inp.value : el.dataset.county);
+  }
+  else if(action==="pmap-delete-county") pmDeleteCounty(el.dataset.county);
+  else if(action==="pmap-open-base-modal") openPmBaseModal();
+  else if(action==="pmap-close-base-modal") closePmBaseModal();
+  else if(action==="pmap-base-download") pmBaseDownload();
+  else if(action==="pmap-base-sample") pmBaseInsertSample();
+  else if(action==="pmap-base-save") pmBaseSave();
+});
+document.addEventListener("input", function(e){
+  const el = e.target.closest("[data-filter]");
+  if(el){ filters[el.dataset.filter] = el.value; renderCurrent(); return; }
+  const nel = e.target.closest("[data-nfilter]");
+  if(nel){ noteFilters[nel.dataset.nfilter] = nel.value; renderCurrent(); return; }
+  const pmfEl = e.target.closest("[data-pmfilter]");
+  if(pmfEl && pmfEl.dataset.pmfilter === "search"){ pmFilters[pmfEl.dataset.pmfilter] = pmfEl.value; renderCurrent(); return; }
+});
+document.addEventListener("change", function(e){
+  const el = e.target.closest("[data-filter]");
+  if(el){ filters[el.dataset.filter] = el.value; renderCurrent(); return; }
+  const nel = e.target.closest("[data-nfilter]");
+  if(nel){ noteFilters[nel.dataset.nfilter] = nel.value; renderCurrent(); return; }
+  const pmfEl = e.target.closest("[data-pmfilter]");
+  if(pmfEl){ pmFilters[pmfEl.dataset.pmfilter] = pmfEl.value; renderCurrent(); return; }
+  const pmField = e.target.closest("[data-pm-field]");
+  if(pmField){ pmSetEntryField(pmActiveCounty, parseInt(pmField.dataset.pmId,10), pmField.dataset.pmField, pmField.value); return; }
+  const pmBulkEl = e.target.closest("[data-pmchapterbulk]");
+  if(pmBulkEl){ pmSetChapterBulkStatus(pmBulkEl.dataset.pmchapterbulk, pmBulkEl.value); return; }
+  if(e.target.id==="pmCountySelect"){ pmActiveCounty = e.target.value; localStorage.setItem(LS_PM_ACTIVE, pmActiveCounty); renderCurrent(); return; }
+  if(e.target.id==="pm_f_stagetype"){
+    const wrap = document.getElementById("pm_f_stagelabel_wrap");
+    if(wrap) wrap.style.display = (e.target.value==="fixed") ? "none" : "";
+    return;
+  }
+  if(e.target.id==="progressOverlayToggle"){ showProgressOverlay = e.target.checked; renderGantt(); return; }
+  if(e.target.id==="task_sort_select"){
+    const parts = e.target.value.split("_");
+    taskSort.by = parts[0]; taskSort.dir = parts[1];
+    renderCurrent();
+    return;
+  }
+  if(e.target.tagName==="SELECT" && (e.target.id.endsWith("_m") || e.target.id.endsWith("_y"))){
+    const base = e.target.id.slice(0, e.target.id.lastIndexOf("_"));
+    const dSel = document.getElementById(base+"_d");
+    const mSel = document.getElementById(base+"_m");
+    const ySel = document.getElementById(base+"_y");
+    if(dSel && mSel && ySel){
+      const jy = parseInt(ySel.value,10), jm = parseInt(mSel.value,10);
+      const maxD = maxDayInMonth(jy,jm);
+      const curD = Math.min(parseInt(dSel.value,10)||1, maxD);
+      dSel.innerHTML = dayOptions(curD, maxD);
+    }
+  }
+});
+document.getElementById("importExcelInput").addEventListener("change", function(e){
+  if(e.target.files && e.target.files[0]) importExcelFile(e.target.files[0]);
+  e.target.value = "";
+});
+document.getElementById("importJsonInput").addEventListener("change", function(e){
+  if(e.target.files && e.target.files[0]) importJsonFile(e.target.files[0]);
+  e.target.value = "";
+});
+document.getElementById("importPmapJsonInput").addEventListener("change", function(e){
+  if(e.target.files && e.target.files[0]) pmImportJsonFile(e.target.files[0]);
+  e.target.value = "";
+});
+document.getElementById("taskModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="taskModalOverlay") closeTaskModal();
+});
+document.getElementById("noteModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="noteModalOverlay") closeNoteModal();
+});
+document.getElementById("ownerModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="ownerModalOverlay") closeOwnerModal();
+});
+document.getElementById("pmActivityModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="pmActivityModalOverlay") closePmActivityModal();
+});
+document.getElementById("pmCountyModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="pmCountyModalOverlay") closePmCountyModal();
+});
+document.getElementById("pmBaseModalOverlay").addEventListener("click", function(e){
+  if(e.target.id==="pmBaseModalOverlay") closePmBaseModal();
+});
+
+/* ============================================================
+   شروع برنامه
+============================================================ */
+loadData();
+pmLoad();
+showTab("dashboard");
+
+</script>
+</body>
+</html>
