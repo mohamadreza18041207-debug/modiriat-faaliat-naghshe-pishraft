@@ -66,6 +66,16 @@
   #toast{ position:fixed; top:calc(14px + env(safe-area-inset-top,0px)); left:50%; transform:translateX(-50%); z-index:60; }
   .toast-item{ background:#111827; color:#fff; padding:10px 18px; border-radius:12px; font-size:15px; margin-bottom:8px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
   .field-label{ font-size:14px; font-weight:700; color:var(--muted); margin-bottom:4px; display:block; }
+  html,body{ overflow-x:hidden; max-width:100%; }
+  select,input,textarea{ max-width:100%; min-width:0; box-sizing:border-box; }
+  select{ text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+  .card, .view-section, .view-section > div{ min-width:0; max-width:100%; }
+  @media (max-width:767px){
+    #pmap-root select, #pmap-root input:not([type=checkbox]):not([type=color]){ width:100%; flex:1 1 100%; }
+    #pmap-root [data-pmchapterbulk]{ width:100%; }
+    #pmap-root .btn{ flex:1 1 auto; }
+    #pmap-root .card .flex{ min-width:0; }
+  }
   .pmap-chip{ padding:6px 12px; border-radius:999px; font-size:13px; font-weight:700; white-space:nowrap; }
 </style>
 </head>
@@ -185,7 +195,7 @@ async function loginToCloud(){
   loadData(); pmLoad(); showTab("dashboard");
 }
 
-function cloudPayload(){ return { tasks, notes, owners, pmActivities, pmCounties, pmProgress, pmActiveCounty, pmMeta }; }
+function cloudPayload(){ return { tasks, notes, owners, stages: stagesList, pmActivities, pmCounties, pmProgress, pmActiveCounty, pmMeta }; }
 
 async function cloudLoadState(){
   try{
@@ -195,6 +205,7 @@ async function cloudLoadState(){
     if(Array.isArray(p.tasks)) localStorage.setItem(LS_TASKS, JSON.stringify(p.tasks));
     if(Array.isArray(p.notes)) localStorage.setItem(LS_NOTES, JSON.stringify(p.notes));
     if(Array.isArray(p.owners)) localStorage.setItem(LS_OWNERS, JSON.stringify(p.owners));
+    if(Array.isArray(p.stages) && p.stages.length) localStorage.setItem(LS_STAGES, JSON.stringify(p.stages));
     if(Array.isArray(p.pmActivities)) localStorage.setItem(LS_PM_ACTIVITIES, JSON.stringify(p.pmActivities));
     if(Array.isArray(p.pmCounties)) localStorage.setItem(LS_PM_COUNTIES, JSON.stringify(p.pmCounties));
     if(p.pmProgress) localStorage.setItem(LS_PM_PROGRESS, JSON.stringify(p.pmProgress));
@@ -298,11 +309,26 @@ function toGregorian(jy, jm, jd) { return d2g(j2d(jy, jm, jd)); }
 /* ============================================================
    ثابت‌ها
 ============================================================ */
-const STAGES = [
-  "شناسایی و ارزیابی گروه","مسئله‌شناسی اولیه","آموزش دوره صراط پیشرفت","جمع‌آوری اطلاعات",
-  "تولید کارنامه","مسئله‌شناسی دینامیک","برنامه‌ریزی","تصویب نقشه پیشرفت منطقه",
-  "راه‌اندازی مرکز پیشرفت","پیگیری و اجرای پروژه‌ها"
+const DEFAULT_STAGES = [
+  {name:"شناسایی و ارزیابی گروه", color:"#8e44ad"},
+  {name:"مسئله‌شناسی اولیه", color:"#2980b9"},
+  {name:"آموزش دوره صراط پیشرفت", color:"#16a085"},
+  {name:"جمع‌آوری اطلاعات", color:"#27ae60"},
+  {name:"تولید کارنامه", color:"#f39c12"},
+  {name:"مسئله‌شناسی دینامیک", color:"#d35400"},
+  {name:"برنامه‌ریزی", color:"#c0392b"},
+  {name:"تصویب نقشه پیشرفت منطقه", color:"#2c3e50"},
+  {name:"راه‌اندازی مرکز پیشرفت", color:"#7f8c8d"},
+  {name:"پیگیری و اجرای پروژه‌ها", color:"#e67e22"}
 ];
+let stagesList = [];            // [{name,color}] به ترتیب مراحل
+let STAGES = [];                // فقط نام‌ها
+let STAGE_COLORS = { "نامشخص":"#bdc3c7" };
+function rebuildStageIndex(){
+  STAGES = stagesList.map(function(x){ return x.name; });
+  STAGE_COLORS = { "نامشخص":"#bdc3c7" };
+  stagesList.forEach(function(x){ STAGE_COLORS[x.name] = x.color; });
+}
 const STATUS_OPTIONS = ["شروع نشده","در حال انجام","متوقف شده","انجام شده"];
 const PRIORITY_OPTIONS = ["زیاد","متوسط","کم"];
 const NOTE_TYPE_OPTIONS = ["اصلاح","ارتقا","پیشنهاد","ریسک / مسئله"];
@@ -311,17 +337,12 @@ const MONTH_NAMES = ["فروردین","اردیبهشت","خرداد","تیر","
 
 const STATUS_COLORS = { "شروع نشده":"#95a5a6", "در حال انجام":"#3498db", "متوقف شده":"#e74c3c", "انجام شده":"#2ecc71" };
 const PRIORITY_COLORS = { "زیاد":"#e74c3c", "متوسط":"#f39c12", "کم":"#2ecc71" };
-const STAGE_COLORS = {
-  "شناسایی و ارزیابی گروه":"#8e44ad","مسئله‌شناسی اولیه":"#2980b9","آموزش دوره صراط پیشرفت":"#16a085",
-  "جمع‌آوری اطلاعات":"#27ae60","تولید کارنامه":"#f39c12","مسئله‌شناسی دینامیک":"#d35400",
-  "برنامه‌ریزی":"#c0392b","تصویب نقشه پیشرفت منطقه":"#2c3e50","راه‌اندازی مرکز پیشرفت":"#7f8c8d",
-  "پیگیری و اجرای پروژه‌ها":"#e67e22","نامشخص":"#bdc3c7"
-};
 const OWNER_PALETTE = ["#2980b9","#8e44ad","#16a085","#d35400","#c0392b","#27ae60","#2c3e50","#e67e22","#7f8c8d","#f39c12"];
 
 const LS_TASKS = "rasad_web_tasks_v1";
 const LS_NOTES = "rasad_web_notes_v1";
 const LS_OWNERS = "rasad_web_owners_v1";
+const LS_STAGES = "rasad_web_stages_v1";
 
 /* ============================================================
    وضعیت برنامه
@@ -372,7 +393,36 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 /* ============================================================
    ذخیره‌سازی (localStorage)
 ============================================================ */
+function loadStages(){
+  let arr = null;
+  try { arr = JSON.parse(localStorage.getItem(LS_STAGES) || "null"); } catch(e){ arr = null; }
+  if(!Array.isArray(arr) || !arr.length) arr = DEFAULT_STAGES;
+  const seen = {};
+  stagesList = [];
+  arr.forEach(function(x, i){
+    if(!x || typeof x.name !== "string") return;
+    const name = x.name.trim();
+    if(!name || name === "نامشخص" || seen[name]) return;
+    seen[name] = true;
+    stagesList.push({ name:name, color:/^#[0-9a-f]{6}$/i.test(x.color||"") ? x.color : OWNER_PALETTE[i % OWNER_PALETTE.length] });
+  });
+  rebuildStageIndex();
+}
+function saveStages(){ try { localStorage.setItem(LS_STAGES, JSON.stringify(stagesList)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
+// مرحله‌ای که در فعالیت/نکته‌ها (مثلاً از اکسل) هست ولی در فهرست نیست، خودکار اضافه شود
+function registerOrphanStages(){
+  let changed = false;
+  tasks.concat(notes).forEach(function(it){
+    const st = (it.stage||"").trim();
+    if(st && st !== "نامشخص" && STAGES.indexOf(st) === -1){
+      stagesList.push({ name:st, color:OWNER_PALETTE[stagesList.length % OWNER_PALETTE.length] });
+      STAGES.push(st); changed = true;
+    }
+  });
+  if(changed){ rebuildStageIndex(); saveStages(); }
+}
 function loadData(){
+  loadStages();
   try { tasks = JSON.parse(localStorage.getItem(LS_TASKS) || "[]"); } catch(e){ tasks = []; }
   try { notes = JSON.parse(localStorage.getItem(LS_NOTES) || "[]"); } catch(e){ notes = []; }
   try { owners = JSON.parse(localStorage.getItem(LS_OWNERS) || "[]"); } catch(e){ owners = []; }
@@ -389,6 +439,7 @@ function loadData(){
   });
   owners.sort(function(a,b){ return a.localeCompare(b,"fa"); });
   if(changed) saveOwners();
+  registerOrphanStages();
 }
 function saveTasks(){ try { localStorage.setItem(LS_TASKS, JSON.stringify(tasks)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
 function saveNotes(){ try { localStorage.setItem(LS_NOTES, JSON.stringify(notes)); queueCloudSave(); } catch(e){ toast("⚠️ ذخیره در حافظه مرورگر ناموفق بود"); } }
@@ -929,6 +980,11 @@ function openTaskModal(id, prefill){
       (t ? '<button class="btn btn-danger" data-action="delete-task" data-id="'+t.id+'">🗑️ حذف</button>' : '') +
       '<button class="btn btn-outline" data-action="close-task-modal">انصراف</button>' +
     '</div>';
+  document.getElementById("f_progress").addEventListener("input", function(e){
+    const st = document.getElementById("f_status");
+    const v = parseInt(e.target.value,10) || 0;
+    if(v > 0 && v < 100 && st.value === "شروع نشده") st.value = "در حال انجام";
+  });
   document.getElementById("f_status").addEventListener("change", function(e){
     if(e.target.value === "انجام شده"){ document.getElementById("f_progress").value = 100; document.getElementById("f_progress_label").textContent = "100"; }
     if(e.target.value === "شروع نشده"){ document.getElementById("f_progress").value = 0; document.getElementById("f_progress_label").textContent = "0"; }
@@ -963,9 +1019,10 @@ function saveTaskFromForm(){
   const priority = document.getElementById("f_priority").value;
   const sj = readDateSelect("f_start");
   const ej = readDateSelect("f_end");
-  const status = document.getElementById("f_status").value;
+  let status = document.getElementById("f_status").value;
   let progress = parseInt(document.getElementById("f_progress").value,10) || 0;
   const desc = document.getElementById("f_desc").value.trim();
+  if(status==="شروع نشده" && progress > 0 && progress < 100) status = "در حال انجام";
   if(status==="انجام شده") progress = 100;
   if(status==="شروع نشده") progress = 0;
 
@@ -1276,6 +1333,104 @@ function deleteNote(id){
   renderCurrent();
 }
 
+
+/* ============================================================
+   مدیریت مراحل نقشه (افزودن / ویرایش / رنگ / ترتیب / حذف)
+============================================================ */
+function stageUsage(name){
+  return { t: tasks.filter(function(x){return x.stage===name;}).length, n: notes.filter(function(x){return x.stage===name;}).length };
+}
+function addStage(name, color){
+  name = (name||"").trim();
+  if(!name){ toast("نام مرحله را وارد کنید"); return; }
+  if(name === "نامشخص"){ toast("این نام رزرو شده است"); return; }
+  if(STAGES.indexOf(name) !== -1){ toast("این مرحله قبلاً ثبت شده است"); return; }
+  stagesList.push({ name:name, color:color || OWNER_PALETTE[stagesList.length % OWNER_PALETTE.length] });
+  rebuildStageIndex(); saveStages();
+  toast("✅ مرحله اضافه شد");
+  renderCurrent();
+}
+function renameStage(oldName, newName){
+  newName = (newName||"").trim();
+  if(!newName){ toast("نام نمی‌تواند خالی باشد"); renderCurrent(); return; }
+  if(newName === oldName) return;
+  if(newName === "نامشخص" || STAGES.indexOf(newName) !== -1){ toast("این نام قبلاً وجود دارد"); renderCurrent(); return; }
+  const st = stagesList.find(function(x){ return x.name === oldName; });
+  if(!st) return;
+  st.name = newName;
+  tasks.forEach(function(t){ if(t.stage === oldName) t.stage = newName; });
+  notes.forEach(function(n){ if(n.stage === oldName) n.stage = newName; });
+  if(filters.stage === oldName) filters.stage = newName;
+  if(noteFilters.stage === oldName) noteFilters.stage = newName;
+  rebuildStageIndex(); saveStages(); saveTasks(); saveNotes();
+  toast("✅ نام مرحله در همهٔ فعالیت‌ها و نکات هم اصلاح شد");
+  renderCurrent();
+}
+function setStageColor(name, color){
+  const st = stagesList.find(function(x){ return x.name === name; });
+  if(!st || !/^#[0-9a-f]{6}$/i.test(color||"")) return;
+  st.color = color;
+  rebuildStageIndex(); saveStages();
+}
+function moveStage(name, dir){
+  const i = stagesList.findIndex(function(x){ return x.name === name; });
+  const j = i + dir;
+  if(i < 0 || j < 0 || j >= stagesList.length) return;
+  const tmp = stagesList[i]; stagesList[i] = stagesList[j]; stagesList[j] = tmp;
+  rebuildStageIndex(); saveStages();
+  renderCurrent();
+}
+function deleteStage(name){
+  if(stagesList.length <= 1){ toast("حداقل یک مرحله باید باقی بماند"); return; }
+  const u = stageUsage(name);
+  const msg = (u.t + u.n) > 0
+    ? ("این مرحله در " + u.t + " فعالیت و " + u.n + " نکته استفاده شده است. با حذف، آن‌ها به «نامشخص» منتقل می‌شوند. ادامه می‌دهید؟")
+    : "این مرحله حذف شود؟";
+  if(!confirm(msg)) return;
+  stagesList = stagesList.filter(function(x){ return x.name !== name; });
+  tasks.forEach(function(t){ if(t.stage === name) t.stage = ""; });
+  notes.forEach(function(n){ if(n.stage === name) n.stage = ""; });
+  if(filters.stage === name) filters.stage = "";
+  if(noteFilters.stage === name) noteFilters.stage = "";
+  rebuildStageIndex(); saveStages(); saveTasks(); saveNotes();
+  toast("🗑️ مرحله حذف شد");
+  renderCurrent();
+}
+function resetStagesToDefault(){
+  if(!confirm("فهرست مراحل به حالت پیش‌فرض برمی‌گردد (فعالیت‌هایی که مرحلهٔ سفارشی دارند، همان مرحله را نگه می‌دارند و دوباره به فهرست افزوده می‌شوند). ادامه می‌دهید؟")) return;
+  stagesList = DEFAULT_STAGES.map(function(x){ return { name:x.name, color:x.color }; });
+  rebuildStageIndex(); registerOrphanStages(); saveStages();
+  toast("↩️ مراحل به حالت پیش‌فرض برگشت");
+  renderCurrent();
+}
+function stagesCardHtml(){
+  const rows = stagesList.map(function(st, i){
+    const u = stageUsage(st.name);
+    const en = escapeHtml(st.name);
+    return '<div class="surface2 rounded-xl p-2 flex items-center gap-2 flex-wrap">' +
+      '<span class="text-[12px] text-muted" style="min-width:20px;text-align:center;">' + (i+1) + '</span>' +
+      '<input type="color" value="' + st.color + '" data-stage-color="' + en + '" style="width:38px;height:34px;padding:2px;cursor:pointer;" title="رنگ مرحله">' +
+      '<input value="' + en + '" data-stage-rename-input="' + en + '" class="flex-1 !py-1.5" style="min-width:140px;">' +
+      '<span class="text-[11px] text-muted whitespace-nowrap">' + u.t + ' فعالیت · ' + u.n + ' نکته</span>' +
+      '<button class="btn btn-ghost !p-1.5" data-action="stage-up" data-stage="' + en + '" title="بالاتر"' + (i===0?' disabled style="opacity:.3"':'') + '>▲</button>' +
+      '<button class="btn btn-ghost !p-1.5" data-action="stage-down" data-stage="' + en + '" title="پایین‌تر"' + (i===stagesList.length-1?' disabled style="opacity:.3"':'') + '>▼</button>' +
+      '<button class="btn btn-ghost !p-1.5" data-action="stage-rename" data-stage="' + en + '" title="ذخیرهٔ نام">💾</button>' +
+      '<button class="btn btn-ghost !p-1.5" data-action="stage-delete" data-stage="' + en + '" title="حذف">🗑️</button>' +
+    '</div>';
+  }).join("");
+  return '<div class="card p-4 mb-3">' +
+    '<h3 class="font-bold mb-1 text-sm">🗺️ مدیریت مراحل نقشه پیشرفت</h3>' +
+    '<p class="text-[12px] text-muted mb-3" style="line-height:1.9;">مراحلی که اینجا تعریف می‌کنید در فرم فعالیت و نکات، فیلترها، داشبورد و گانت نمایش داده می‌شوند. با تغییر نام یک مرحله، نام آن در همهٔ فعالیت‌ها و نکات قبلی هم اصلاح می‌شود. ترتیب فهرست را با ▲ و ▼ تغییر دهید.</p>' +
+    '<div class="flex gap-2 mb-3 flex-wrap items-center">' +
+      '<input type="color" id="new_stage_color" value="' + OWNER_PALETTE[stagesList.length % OWNER_PALETTE.length] + '" style="width:38px;height:34px;padding:2px;cursor:pointer;" title="رنگ مرحله جدید">' +
+      '<input id="new_stage_input" placeholder="نام مرحله جدید..." class="flex-1" style="min-width:160px;">' +
+      '<button class="btn btn-primary" data-action="stage-add">➕ افزودن مرحله</button>' +
+    '</div>' +
+    '<div class="space-y-2">' + rows + '</div>' +
+    '<div class="mt-3"><button class="btn btn-ghost" data-action="stage-reset">↩️ بازگشت به مراحل پیش‌فرض</button></div>' +
+  '</div>';
+}
+
 /* ============================================================
    داده‌ها (خروجی/ورودی)
 ============================================================ */
@@ -1291,6 +1446,7 @@ function renderData(){
         'تعداد نکات اصلاح/ارتقای ثبت‌شده: <b>' + notes.length + '</b>' +
       '</p>' +
     '</div>' +
+    stagesCardHtml() +
     '<div class="card p-4 mb-3">' +
       '<h3 class="font-bold mb-1 text-sm">📥 خروجی اکسل</h3>' +
       '<p class="text-[12px] text-muted mb-3">فایل اکسل با ستون‌های همسان با نسخه دسکتاپ (Streamlit) — برای انتقال داده بین دو نسخه.</p>' +
@@ -1324,7 +1480,7 @@ function downloadBlob(content, filename, mime){
 }
 
 function exportJson(){
-  const payload = { tasks: tasks, notes: notes, exportedAt: new Date().toISOString() };
+  const payload = { tasks: tasks, notes: notes, stages: stagesList, exportedAt: new Date().toISOString() };
   downloadBlob(JSON.stringify(payload, null, 2), "rasad_backup.json", "application/json");
   toast("⬇️ فایل پشتیبان دانلود شد");
 }
@@ -1340,6 +1496,17 @@ function importJsonFile(file){
       if(Array.isArray(data.notes)){
         data.notes.forEach(function(n){ if(n && n.id && !notes.some(function(x){return x.id===n.id;})){ notes.push(n); addedN++; } });
       }
+      if(Array.isArray(data.stages)){
+        data.stages.forEach(function(x){
+          const nm = x && typeof x.name==="string" ? x.name.trim() : "";
+          if(nm && nm!=="نامشخص" && STAGES.indexOf(nm)===-1){
+            stagesList.push({ name:nm, color:/^#[0-9a-f]{6}$/i.test(x.color||"") ? x.color : OWNER_PALETTE[stagesList.length % OWNER_PALETTE.length] });
+            STAGES.push(nm);
+          }
+        });
+        rebuildStageIndex(); saveStages();
+      }
+      registerOrphanStages();
       saveTasks(); saveNotes();
       toast("✅ " + addedT + " فعالیت و " + addedN + " نکته وارد شد");
       renderCurrent();
@@ -1409,6 +1576,7 @@ function importExcelFile(file){
           }
         });
       });
+      registerOrphanStages();
       saveTasks(); saveNotes();
       toast("✅ " + addedT + " فعالیت و " + addedN + " نکته از اکسل وارد شد");
       renderCurrent();
@@ -2078,6 +2246,18 @@ document.addEventListener("click", function(e){
     renameOwner(el.dataset.owner, inp ? inp.value : el.dataset.owner);
   }
   else if(action==="delete-owner") deleteOwner(el.dataset.owner);
+  else if(action==="stage-add"){
+    const inp = document.getElementById("new_stage_input"), col = document.getElementById("new_stage_color");
+    addStage(inp ? inp.value : "", col ? col.value : "");
+  }
+  else if(action==="stage-rename"){
+    const inp = document.querySelector('[data-stage-rename-input="' + CSS.escape(el.dataset.stage) + '"]');
+    renameStage(el.dataset.stage, inp ? inp.value : el.dataset.stage);
+  }
+  else if(action==="stage-delete") deleteStage(el.dataset.stage);
+  else if(action==="stage-up") moveStage(el.dataset.stage, -1);
+  else if(action==="stage-down") moveStage(el.dataset.stage, 1);
+  else if(action==="stage-reset") resetStagesToDefault();
   else if(action==="export-json") exportJson();
   else if(action==="import-json-trigger") document.getElementById("importJsonInput").click();
   else if(action==="export-excel") exportExcel();
@@ -2168,6 +2348,22 @@ document.addEventListener("change", function(e){
 document.getElementById("importExcelInput").addEventListener("change", function(e){
   if(e.target.files && e.target.files[0]) importExcelFile(e.target.files[0]);
   e.target.value = "";
+});
+document.addEventListener("change", function(e){
+  const c = e.target.closest && e.target.closest("[data-stage-color]");
+  if(c){ setStageColor(c.dataset.stageColor, c.value); toast("🎨 رنگ مرحله ذخیره شد"); }
+});
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Enter") return;
+  const t = e.target;
+  if(t && t.id === "new_stage_input"){
+    e.preventDefault();
+    const col = document.getElementById("new_stage_color");
+    addStage(t.value, col ? col.value : "");
+  } else if(t && t.dataset && t.dataset.stageRenameInput !== undefined){
+    e.preventDefault();
+    renameStage(t.dataset.stageRenameInput, t.value);
+  }
 });
 document.getElementById("importJsonInput").addEventListener("change", function(e){
   if(e.target.files && e.target.files[0]) importJsonFile(e.target.files[0]);
